@@ -1,0 +1,2893 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acionamentos SCADA — Energisa GEAT</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── DESIGN TOKENS ─────────────────────────────── */
+:root {
+  /* Energisa brand */
+  --e-blue:      #1a75bc;
+  --e-blue-dark: #135a96;
+  --e-blue-mid:  #2b8ad4;
+  --e-blue-soft: #e8f2fb;
+  --e-blue-pale: #f0f6fc;
+  --e-green:     #00a859;
+  --e-green-soft:#e5f7ee;
+  /* Semantic */
+  --success:     #059669;
+  --success-bg:  #ecfdf5;
+  --warning:     #d97706;
+  --warning-bg:  #fffbeb;
+  --danger:      #dc2626;
+  --danger-bg:   #fef2f2;
+  --info:        #0284c7;
+  --info-bg:     #f0f9ff;
+  /* Neutrals */
+  --bg:          #f1f5f9;
+  --surface:     #ffffff;
+  --surface-2:   #f8fafc;
+  --border:      #e2e8f0;
+  --border-2:    #cbd5e1;
+  --text-1:      #0f172a;
+  --text-2:      #475569;
+  --text-3:      #94a3b8;
+  /* Layout */
+  --sidebar-w:   240px;
+  --topbar-h:    60px;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --shadow-sm:   0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:   0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:   0 10px 30px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05);
+  --transition:  all .2s ease;
+}
+
+/* ── RESET & BASE ──────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text-1);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+
+/* ── LAYOUT ────────────────────────────────────── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+/* ── SIDEBAR ───────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width .25s ease;
+  z-index: 100;
+  overflow: hidden;
+}
+.sidebar.slim { width: 60px; }
+
+.sidebar-logo {
+  height: var(--topbar-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo-mark {
+  width: 32px; height: 32px; flex-shrink: 0;
+  background: var(--e-blue);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 15px;
+}
+.logo-name {
+  font-size: 15px; font-weight: 700;
+  color: var(--e-blue-dark);
+  white-space: nowrap;
+  opacity: 1; transition: opacity .2s;
+}
+.sidebar.slim .logo-name { opacity: 0; pointer-events: none; }
+
+.sidebar-nav { flex: 1; padding: 12px 8px; overflow-y: auto; }
+.nav-group { margin-bottom: 20px; }
+.nav-group-label {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 0 8px 6px;
+  white-space: nowrap; overflow: hidden;
+}
+.sidebar.slim .nav-group-label { opacity: 0; }
+
+.nav-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.nav-link i { width: 18px; text-align: center; font-size: 14px; flex-shrink: 0; }
+.nav-link:hover { background: var(--e-blue-pale); color: var(--e-blue); }
+.nav-link.active { background: var(--e-blue-soft); color: var(--e-blue); font-weight: 600; }
+.nav-link.active i { color: var(--e-blue); }
+.nav-link-text { opacity: 1; transition: opacity .15s; }
+.sidebar.slim .nav-link-text { opacity: 0; }
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding: 10px 8px;
+}
+.toggle-btn {
+  width: 100%; background: transparent; border: none; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  color: var(--text-3); font-size: 13px;
+  transition: var(--transition);
+}
+.toggle-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.toggle-btn i { width: 18px; text-align: center; transition: transform .25s; }
+.sidebar.slim .toggle-btn i { transform: rotate(180deg); }
+
+/* ── MAIN ──────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TOPBAR ────────────────────────────────────── */
+.topbar {
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+.page-heading { flex: 1; }
+.page-heading h1 { font-size: 17px; font-weight: 700; color: var(--text-1); }
+.page-heading p  { font-size: 12px; color: var(--text-3); margin-top: 1px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--e-blue-soft);
+  border: 2px solid var(--e-blue-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--e-blue);
+}
+.user-block { display: flex; align-items: center; gap: 8px; }
+.user-info span:first-child { display: block; font-size: 13px; font-weight: 600; color: var(--text-1); line-height: 1.2; }
+.user-info span:last-child  { display: block; font-size: 11px; color: var(--text-3); }
+.data-pill {
+  font-size: 11px; padding: 4px 10px;
+  border-radius: 20px; font-weight: 600;
+  background: var(--e-blue-soft);
+  color: var(--e-blue);
+  display: none;
+}
+
+/* ── CONTENT ───────────────────────────────────── */
+.content { flex: 1; overflow-y: auto; padding: 20px 24px 32px; }
+
+/* ── CARDS ─────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.card-head h2 {
+  font-size: 14px; font-weight: 600; color: var(--text-1);
+  display: flex; align-items: center; gap: 8px;
+}
+.card-head h2 i { color: var(--e-blue); font-size: 13px; }
+.card-body  { padding: 18px; }
+.card-actions { display: flex; gap: 4px; }
+.icon-btn {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); border: none; background: transparent;
+  color: var(--text-3); cursor: pointer; transition: var(--transition); font-size: 12px;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text-2); }
+
+/* ── UPLOAD ────────────────────────────────────── */
+.upload-zone {
+  background: var(--surface);
+  border: 2px dashed var(--border-2);
+  border-radius: var(--radius-lg);
+  padding: 48px 32px;
+  text-align: center;
+  transition: var(--transition);
+  margin-bottom: 20px;
+}
+.upload-zone.drag { border-color: var(--e-blue); background: var(--e-blue-pale); }
+.upload-zone:hover { border-color: var(--e-blue); }
+.upload-icon-wrap {
+  width: 64px; height: 64px; margin: 0 auto 16px;
+  background: var(--e-blue-soft);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--e-blue);
+}
+.upload-zone h3 { font-size: 16px; font-weight: 600; color: var(--text-1); margin-bottom: 6px; }
+.upload-zone p  { font-size: 13px; color: var(--text-3); margin-bottom: 20px; }
+
+/* ── BUTTONS ───────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  border: 1px solid transparent; cursor: pointer;
+  transition: var(--transition); text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--e-blue); color: #fff;
+  border-color: var(--e-blue);
+}
+.btn-primary:hover { background: var(--e-blue-dark); border-color: var(--e-blue-dark); color: #fff; }
+.btn-ghost {
+  background: transparent; color: var(--text-2);
+  border-color: var(--border);
+}
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--border-2); color: var(--text-1); }
+.btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-sm { padding: 5px 11px; font-size: 12px; }
+
+/* ── ALERTS ────────────────────────────────────── */
+.notice {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 16px; border-radius: var(--radius-md);
+  font-size: 13px; margin-bottom: 16px;
+  border: 1px solid transparent;
+}
+.notice i { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+.notice-info    { background: var(--info-bg);    border-color: #bae6fd; color: var(--info); }
+.notice-success { background: var(--success-bg); border-color: #a7f3d0; color: var(--success); }
+.notice-warning { background: var(--warning-bg); border-color: #fde68a; color: var(--warning); }
+.notice-danger  { background: var(--danger-bg);  border-color: #fecaca; color: var(--danger); }
+.notice strong  { color: inherit; }
+
+/* ── KPI GRID ──────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: var(--transition);
+}
+.kpi:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.kpi::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.kpi-blue::before    { background: var(--e-blue); }
+.kpi-green::before   { background: var(--e-green); }
+.kpi-success::before { background: var(--success); }
+.kpi-warning::before { background: var(--warning); }
+.kpi-danger::before  { background: var(--danger); }
+
+.kpi-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.kpi-label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.kpi-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+.kpi-blue .kpi-icon    { background: var(--e-blue-soft);  color: var(--e-blue); }
+.kpi-green .kpi-icon   { background: var(--e-green-soft); color: var(--e-green); }
+.kpi-success .kpi-icon { background: var(--success-bg);   color: var(--success); }
+.kpi-warning .kpi-icon { background: var(--warning-bg);   color: var(--warning); }
+.kpi-danger .kpi-icon  { background: var(--danger-bg);    color: var(--danger); }
+
+.kpi-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 26px; font-weight: 500;
+  color: var(--text-1);
+  letter-spacing: -0.5px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.kpi-meta {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11.5px; color: var(--text-3);
+}
+.trend { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; font-size: 11.5px; }
+.trend-up   { color: var(--success); }
+.trend-down { color: var(--danger); }
+.trend-flat { color: var(--text-3); }
+.sla-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 600; padding: 2px 7px;
+  border-radius: 20px;
+}
+.sla-ok  { background: var(--success-bg); color: var(--success); }
+.sla-bad { background: var(--danger-bg);  color: var(--danger); }
+.sla-warn{ background: var(--warning-bg); color: var(--warning); }
+
+/* ── FILTERS ───────────────────────────────────── */
+.filter-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.filter-bar .filter-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.filter-bar .filter-head h3 {
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  display: flex; align-items: center; gap: 7px;
+}
+.filter-bar .filter-head h3 i { color: var(--e-blue); }
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) repeat(3, 1fr);
+  gap: 10px;
+}
+.filter-grid > * { min-width: 0; }
+.form-label {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--text-2); margin-bottom: 4px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.form-ctrl {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  transition: var(--transition);
+  appearance: none;
+}
+.form-ctrl:focus {
+  outline: none;
+  border-color: var(--e-blue);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(26,117,188,.12);
+}
+
+/* ── CHARTS GRID ───────────────────────────────── */
+.chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-grid-1 { margin-bottom: 16px; }
+.chart-wrap { position: relative; height: 280px; }
+.chart-wrap.tall { height: 340px; }
+
+/* ── INSIGHTS ──────────────────────────────────── */
+.insight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.insight {
+  display: flex; gap: 12px; padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+.insight:hover { box-shadow: var(--shadow-md); }
+.insight-dot {
+  width: 36px; height: 36px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.i-pos { background: var(--success-bg); color: var(--success); }
+.i-warn{ background: var(--warning-bg); color: var(--warning); }
+.i-neg { background: var(--danger-bg);  color: var(--danger); }
+.i-info{ background: var(--info-bg);    color: var(--info); }
+.insight-title { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 3px; }
+.insight-desc  { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+/* ── TABLE ─────────────────────────────────────── */
+.search-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.search-wrap { position: relative; flex: 1; max-width: 360px; }
+.search-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 12px; }
+.search-wrap input { padding-left: 32px; }
+
+.tbl-wrap { overflow-x: auto; border-radius: var(--radius-md); border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+thead th.sortable { cursor: pointer; user-select: none; }
+thead th.sortable:hover { background: var(--e-blue-pale); color: var(--e-blue); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--e-blue-pale); }
+tbody td { padding: 10px 14px; font-size: 13px; color: var(--text-1); white-space: nowrap; }
+.sort-arrow { display: inline-block; width: 14px; text-align: right; color: var(--text-3); font-size: 10px; }
+.sort-arrow.asc::after  { content: ' ↑'; color: var(--e-blue); }
+.sort-arrow.desc::after { content: ' ↓'; color: var(--e-blue); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap;
+}
+.badge-success { background: var(--success-bg); color: var(--success); }
+.badge-warning { background: var(--warning-bg); color: var(--warning); }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger); }
+.badge-neutral { background: var(--surface-2);  color: var(--text-2); border: 1px solid var(--border); }
+.badge-info    { background: var(--info-bg);     color: var(--info); }
+
+.tbl-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0 0; font-size: 12px; color: var(--text-3);
+}
+.pager { display: flex; gap: 4px; }
+.pg-btn {
+  min-width: 28px; height: 28px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--surface); font-size: 12px; font-weight: 500;
+  color: var(--text-2); cursor: pointer; transition: var(--transition);
+}
+.pg-btn:hover { border-color: var(--e-blue); color: var(--e-blue); }
+.pg-btn.active { background: var(--e-blue); border-color: var(--e-blue); color: #fff; }
+.pg-btn.disabled { opacity: .4; pointer-events: none; }
+
+/* ── TABS ──────────────────────────────────────── */
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── PERF TAB ──────────────────────────────────── */
+.perf-grid { display: grid; grid-template-columns: 5fr 3fr; gap: 16px; margin-bottom: 16px; }
+.ranking-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+  font-size: 13px;
+}
+.ranking-row:last-child { border-bottom: none; }
+.ranking-row:hover { background: var(--e-blue-pale); }
+.rank-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.r1 { background: #fef9c3; color: #92400e; }
+.r2 { background: #f1f5f9; color: #64748b; }
+.r3 { background: #fff7ed; color: #92400e; }
+.rn { background: var(--surface-2); color: var(--text-3); }
+.rank-name { flex: 1; font-weight: 500; }
+.bar-wrap { width: 80px; background: var(--surface-2); border-radius: 4px; height: 6px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; }
+.bar-green { background: var(--e-green); }
+.bar-blue  { background: var(--e-blue); }
+.bar-warn  { background: var(--warning); }
+.bar-red   { background: var(--danger); }
+
+/* ── DATA QUALITY PANEL ────────────────────────── */
+.dq-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.dq-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  text-align: center;
+}
+.dq-num { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 500; color: var(--text-1); }
+.dq-label { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.dq-sub { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+
+/* ── MODAL ─────────────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(15,23,42,.4);
+  backdrop-filter: blur(2px);
+  z-index: 9000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 90%; max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.modal-body { padding: 20px; }
+.modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+.detail-pair {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 0; border-bottom: 1px solid var(--border); gap: 16px;
+}
+.detail-pair:last-child { border-bottom: none; }
+.dp-key { font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.dp-val { font-size: 13px; color: var(--text-1); text-align: right; word-break: break-word; max-width: 65%; }
+.detail-block { margin-top: 14px; }
+.detail-block .db-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); margin-bottom: 6px; }
+.detail-block .db-text { font-size: 12.5px; color: var(--text-2); line-height: 1.7; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; border: 1px solid var(--border); }
+
+/* ── CHART MODAL ───────────────────────────────── */
+#chartModalBox { max-width: 860px; }
+#chartModalBox .chart-wrap { height: 440px; }
+
+/* ── REPORT TAB ────────────────────────────────── */
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-box {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+.sb-val { font-family: 'DM Mono', monospace; font-size: 28px; font-weight: 500; color: var(--text-1); margin-bottom: 2px; }
+.sb-label { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.sb-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+.kpi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kpi-table th { padding: 8px 12px; background: var(--surface-2); text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.kpi-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.kpi-table tr:last-child td { border-bottom: none; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot-ok  { background: var(--success); }
+.dot-bad { background: var(--danger); }
+.dot-warn{ background: var(--warning); }
+
+/* ── PNG EXPORT ─────────────────────────────────── */
+/* Full-screen spinner shown while html2canvas renders */
+#pngSpinnerOverlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 19000;
+  background: rgba(15,23,42,.55);
+  backdrop-filter: blur(3px);
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px;
+}
+#pngSpinnerOverlay.open { display: flex; }
+#pngSpinnerOverlay .png-spinner {
+  width: 52px; height: 52px;
+  border: 4px solid rgba(255,255,255,.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .75s linear infinite;
+}
+#pngSpinnerOverlay p {
+  color: #fff; font-size: 14px; font-weight: 500; letter-spacing: .02em;
+}
+/* Off-screen snapshot canvas — positioned outside viewport */
+#pngSnapshotRoot {
+  position: fixed;
+  top: 0; left: -9999px;
+  width: 820px;           /* fixed width → no responsive truncation   */
+  background: #ffffff;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  color: #0f172a;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* ── LOADING ───────────────────────────────────── */
+.spinner-wrap { text-align: center; padding: 40px; display: none; }
+.spinner {
+  width: 36px; height: 36px; margin: 0 auto 12px;
+  border: 3px solid var(--border);
+  border-top-color: var(--e-blue);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-up { animation: fadeUp .35s ease forwards; }
+
+/* ── RESPONSIVE ────────────────────────────────── */
+@media (max-width: 1280px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .chart-grid-2, .perf-grid { grid-template-columns: 1fr; }
+  .filter-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 900px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .filter-grid { grid-template-columns: repeat(2, 1fr); }
+  .dq-grid { grid-template-columns: repeat(2, 1fr); }
+  .stat-row { grid-template-columns: repeat(2, 1fr); }
+  .sidebar { width: 60px; }
+  .sidebar .logo-name, .sidebar .nav-link-text, .sidebar .nav-group-label { display: none; }
+  .content { padding: 14px; }
+}
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: 1fr 1fr; }
+  .topbar { padding: 0 14px; }
+  .content { padding: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ── SIDEBAR ─────────────────────────────────── -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark"><i class="fas fa-bolt"></i></div>
+    <span class="logo-name">Acionamentos SCADA</span>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-group">
+      <div class="nav-group-label">Análise</div>
+      <a class="nav-link active" data-tab="dashboard">
+        <i class="fas fa-chart-pie"></i><span class="nav-link-text">Dashboard</span>
+      </a>
+      <a class="nav-link" data-tab="performance">
+        <i class="fas fa-users"></i><span class="nav-link-text">Performance</span>
+      </a>
+      <a class="nav-link" data-tab="tendencias">
+        <i class="fas fa-chart-line"></i><span class="nav-link-text">Tendências</span>
+      </a>
+      <a class="nav-link" data-tab="relatorios">
+        <i class="fas fa-file-alt"></i><span class="nav-link-text">Relatórios</span>
+      </a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-label">Exportar</div>
+      <a class="nav-link" id="navExportCsv">
+        <i class="fas fa-file-csv"></i><span class="nav-link-text">Exportar CSV</span>
+      </a>
+      <a class="nav-link" id="navExportPdf">
+        <i class="fas fa-file-pdf"></i><span class="nav-link-text">Exportar PDF</span>
+      </a>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    <button class="toggle-btn" id="toggleSidebar">
+      <i class="fas fa-chevron-left"></i>
+      <span class="nav-link-text" style="font-size:13px; color: var(--text-2);">Recolher</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ── MAIN ────────────────────────────────────── -->
+<div class="main">
+  <header class="topbar">
+    <div class="page-heading">
+      <h1 id="pageTitle">Dashboard de Acionamentos</h1>
+      <p id="pageSubtitle">Análise operacional do time SCADA/ADMS</p>
+    </div>
+    <div class="topbar-actions">
+      <span class="data-pill" id="dataPill">0 registros</span>
+      <div class="user-block">
+        <div class="avatar">AM</div>
+        <div class="user-info">
+          <span>Adélia Maria</span>
+          <span>GEAT · Energisa</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- ════ TAB: DASHBOARD ════ -->
+    <div id="dashboard" class="tab-content active">
+
+      <!-- Upload zone -->
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon-wrap"><i class="fas fa-cloud-upload-alt"></i></div>
+        <h3>Importar Relatório de Sobreaviso</h3>
+        <p>Arraste e solte o arquivo CSV exportado do formulário, ou clique para selecionar</p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <input type="file" id="csvInput" class="d-none" accept=".csv">
+          <button class="btn btn-primary" id="uploadBtn"><i class="fas fa-upload"></i> Selecionar CSV</button>
+        </div>
+        <div id="uploadMsg" style="margin-top:12px;"></div>
+      </div>
+
+      <!-- Loading -->
+      <div class="spinner-wrap" id="loadingWrap">
+        <div class="spinner"></div>
+        <p style="font-size:13px;color:var(--text-2);">Processando dados…</p>
+      </div>
+
+      <!-- Dashboard body (hidden until data loaded) -->
+      <div id="dashBody" style="display:none;">
+
+        <!-- Info bar -->
+        <div class="notice notice-info" id="dataNotice">
+          <i class="fas fa-database"></i>
+          <div id="dataNoticeText" style="flex:1;"></div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button class="btn btn-ghost btn-sm" id="btnReset"><i class="fas fa-sync-alt"></i> Redefinir filtros</button>
+            <button class="btn btn-ghost btn-sm" id="btnTrocarCSV" title="Remover dados e carregar novo arquivo"><i class="fas fa-folder-open"></i> Trocar CSV</button>
+          </div>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpi-grid" id="kpiGrid">
+          <div class="kpi kpi-blue">
+            <div class="kpi-row">
+              <span class="kpi-label">Total de Acionamentos</span>
+              <div class="kpi-icon"><i class="fas fa-bell"></i></div>
+            </div>
+            <div class="kpi-value" id="kTotal">—</div>
+            <div class="kpi-meta"><span id="trendTotal" class="trend"></span><span id="kTotalSub">Período selecionado</span></div>
+          </div>
+          <div class="kpi kpi-green">
+            <div class="kpi-row">
+              <span class="kpi-label">Resolução pelo SCADA</span>
+              <div class="kpi-icon"><i class="fas fa-check-circle"></i></div>
+            </div>
+            <div class="kpi-value" id="kResol">—</div>
+            <div class="kpi-meta"><span id="trendResol" class="trend"></span><span>Meta: 85%</span></div>
+          </div>
+          <div class="kpi kpi-success">
+            <div class="kpi-row">
+              <span class="kpi-label">Tempo Médio de Resposta</span>
+              <div class="kpi-icon"><i class="fas fa-stopwatch"></i></div>
+            </div>
+            <div class="kpi-value" id="kTempo">—</div>
+            <div class="kpi-meta" id="kTempoMeta"></div>
+          </div>
+          <div class="kpi kpi-warning">
+            <div class="kpi-row">
+              <span class="kpi-label">Acionamentos Indevidos</span>
+              <div class="kpi-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            </div>
+            <div class="kpi-value" id="kIndev">—</div>
+            <div class="kpi-meta"><span id="trendIndev" class="trend"></span><span>Meta: &lt;15%</span></div>
+          </div>
+          <div class="kpi kpi-blue">
+            <div class="kpi-row">
+              <span class="kpi-label">Somente SCADA</span>
+              <div class="kpi-icon"><i class="fas fa-user-shield"></i></div>
+            </div>
+            <div class="kpi-value" id="kSolo">—</div>
+            <div class="kpi-meta"><span id="kSoloPct">—</span><span> do total</span></div>
+          </div>
+          <div class="kpi kpi-success">
+            <div class="kpi-row">
+              <span class="kpi-label">Dentro do SLA (≤60 min)</span>
+              <div class="kpi-icon"><i class="fas fa-tachometer-alt"></i></div>
+            </div>
+            <div class="kpi-value" id="kSLA">—</div>
+            <div class="kpi-meta"><span id="kSLAsub" style="font-size:11px;color:var(--text-3);">Meta: ≥ 80% dos casos</span></div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+          <div class="filter-head">
+            <h3><i class="fas fa-sliders-h"></i> Filtros</h3>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" id="btnApply"><i class="fas fa-check"></i> Aplicar</button>
+              <button class="btn btn-ghost btn-sm" id="btnClear"><i class="fas fa-times"></i> Limpar</button>
+            </div>
+          </div>
+          <div class="filter-grid">
+            <div>
+              <label class="form-label">Sistema</label>
+              <select id="fSistema" class="form-ctrl"><option value="">Todos</option></select>
+            </div>
+            <div>
+              <label class="form-label">Empresa</label>
+              <select id="fEmpresa" class="form-ctrl"><option value="">Todas</option></select>
+            </div>
+            <div>
+              <label class="form-label">Data início</label>
+              <input type="date" id="fDtIni" class="form-ctrl">
+            </div>
+            <div>
+              <label class="form-label">Data fim</label>
+              <input type="date" id="fDtFim" class="form-ctrl">
+            </div>
+            <div>
+              <label class="form-label">Colaborador</label>
+              <select id="fColaborador" class="form-ctrl"><option value="">Todos</option></select>
+            </div>
+            <div>
+              <label class="form-label">Área Solicitante</label>
+              <select id="fArea" class="form-ctrl"><option value="">Todas</option></select>
+            </div>
+            <div>
+              <label class="form-label">Necessidade SCADA</label>
+              <select id="fNecessario" class="form-ctrl">
+                <option value="">Todos</option>
+                <option value="SIM">Necessário</option>
+                <option value="NÃO">Indevido</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head">
+            <h2><i class="fas fa-lightbulb"></i> Insights Automáticos</h2>
+            <div class="card-actions">
+              <button class="icon-btn" id="btnRefreshInsights" title="Atualizar insights"><i class="fas fa-sync-alt"></i></button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="insight-grid" id="insightContainer"></div>
+          </div>
+        </div>
+
+        <!-- Charts row 1 -->
+        <div class="chart-grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-building"></i> Acionamentos por Empresa</h2>
+              <button class="icon-btn expand-btn" data-cid="cEmpresa" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cEmpresa"></canvas></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-money-bill-wave"></i> Horas Sobreaviso vs Indevidas</h2>
+              <button class="icon-btn expand-btn" data-cid="cHoras" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cHoras"></canvas></div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Duração calculada a partir dos campos reais "Hora de início" e "Hora de conclusão"</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts row 1b: Sistema -->
+        <div class="chart-grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-server"></i> Desempenho por Sistema (Siemens / Elipse / ADMS)</h2>
+              <button class="icon-btn expand-btn" data-cid="cSistema" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cSistema"></canvas></div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Verde = resolvido SCADA · Vermelho = indevido · Cinza = outros</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-exclamation-circle"></i> Qualidade dos Dados</h2>
+            </div>
+            <div class="card-body">
+              <div class="dq-grid" id="dqPanel"></div>
+              <div id="dqAlerts" style="margin-top:12px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart row 2 -->
+        <div class="chart-grid-1">
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-chart-area"></i> Volume de Acionamentos ao Longo do Tempo</h2>
+              <button class="icon-btn expand-btn" data-cid="cTempo" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cTempo"></canvas></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="card">
+          <div class="card-head">
+            <h2><i class="fas fa-table"></i> Registros Detalhados</h2>
+            <div class="card-actions">
+              <button class="icon-btn" id="btnExportTbl" title="Exportar CSV"><i class="fas fa-download"></i></button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="search-row">
+              <div class="search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" id="tblSearch" class="form-ctrl" placeholder="Buscar por nome, empresa, sistema, área…" style="padding-left:30px;">
+              </div>
+              <span id="tblCount" style="font-size:12px;color:var(--text-3);white-space:nowrap;"></span>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="sortable" data-col="Id">ID <span class="sort-arrow" id="sa-Id"></span></th>
+                    <th class="sortable" data-col="dataSort">Data <span class="sort-arrow" id="sa-dataSort"></span></th>
+                    <th class="sortable" data-col="Nome">Colaborador <span class="sort-arrow" id="sa-Nome"></span></th>
+                    <th class="sortable" data-col="EMPRESA">Empresa <span class="sort-arrow" id="sa-EMPRESA"></span></th>
+                    <th class="sortable" data-col="Sistema">Sistema <span class="sort-arrow" id="sa-Sistema"></span></th>
+                    <th>Área</th>
+                    <th>Status</th>
+                    <th class="sortable" data-col="tempoResposta">Resposta <span class="sort-arrow" id="sa-tempoResposta"></span></th>
+                    <th>Necessário</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="tblBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-footer">
+              <span id="tblInfo" style="color:var(--text-3);font-size:12px;"></span>
+              <div class="pager" id="pager"></div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /dashBody -->
+    </div><!-- /dashboard tab -->
+
+    <!-- ════ TAB: PERFORMANCE ════ -->
+    <div id="performance" class="tab-content">
+      <div id="perfNoData" class="notice notice-info"><i class="fas fa-info-circle"></i> Carregue um CSV no Dashboard para visualizar a análise de performance.</div>
+      <div id="perfBody" style="display:none;">
+        <div class="perf-grid">
+          <div class="card">
+            <div class="card-head"><h2><i class="fas fa-chart-scatter"></i> Volume × Taxa de Resolução por Colaborador</h2></div>
+            <div class="card-body">
+              <div class="chart-wrap tall"><canvas id="cColabs"></canvas></div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Eixo X = total de acionamentos · Eixo Y = taxa de resolução SCADA (%) · Tamanho da bolha = % de indevidos</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h2><i class="fas fa-trophy"></i> Ranking de Resolução</h2></div>
+            <div style="overflow:hidden;" id="rankingList"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><h2><i class="fas fa-clock"></i> Distribuição Horária dos Acionamentos</h2></div>
+          <div class="card-body">
+            <div class="chart-wrap"><canvas id="cHoras24"></canvas></div>
+            <div id="peakInfo" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+            <p style="font-size:11px;color:var(--text-3);margin-top:6px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Vermelho = pico de demanda · Azul = baixa demanda · Baseado no campo "Hora início atendimento"</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TAB: TENDÊNCIAS ════ -->
+    <div id="tendencias" class="tab-content">
+      <div id="tendNoData" class="notice notice-info"><i class="fas fa-info-circle"></i> Carregue um CSV no Dashboard para visualizar as tendências.</div>
+      <div id="tendBody" style="display:none;">
+        <div class="chart-grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-chart-line"></i> Performance Mensal Consolidada</h2>
+              <button class="icon-btn expand-btn" data-cid="cMensal" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cMensal"></canvas></div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Barras empilhadas = volume por categoria · Linhas = % Resolução, % Indevidos e % SLA ≤60 min (eixo direito) · Hover para ver tempo médio do mês</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head">
+              <h2><i class="fas fa-chart-bar"></i> Pareto — Áreas Solicitantes</h2>
+              <button class="icon-btn expand-btn" data-cid="cPareto" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap"><canvas id="cPareto"></canvas></div>
+              <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> Barras = volume · Linha laranja = % acumulado (Pareto)</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2><i class="fas fa-stopwatch"></i> TMR — Tempo Médio de Resolução</h2>
+            <button class="icon-btn expand-btn" data-cid="cDistTempo" title="Expandir"><i class="fas fa-expand-alt"></i></button>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap"><canvas id="cDistTempo"></canvas></div>
+            <p style="font-size:11px;color:var(--text-3);margin-top:8px;"><i class="fas fa-info-circle" style="color:var(--info);"></i> TMR por faixa de duração · Vermelho = acima do SLA (60 min) · Verde = dentro do SLA · <strong id="tempoValidoInfo"></strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ TAB: RELATÓRIOS ════ -->
+    <div id="relatorios" class="tab-content">
+      <div id="relNoData" class="notice notice-info"><i class="fas fa-info-circle"></i> Carregue um CSV no Dashboard para gerar o relatório.</div>
+      <div id="relBody" style="display:none;">
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><h2><i class="fas fa-chart-pie"></i> Resumo Executivo</h2></div>
+          <div class="card-body">
+            <div class="stat-row" id="statRow"></div>
+            <div class="notice notice-info" id="relSummary" style="margin-bottom:0;"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-head"><h2><i class="fas fa-clipboard-check"></i> Status dos Indicadores</h2></div>
+          <div class="card-body" style="padding:0;">
+            <table class="kpi-table" id="kpiTable"></table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2><i class="fas fa-download"></i> Exportação</h2></div>
+          <div class="card-body">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+              <button class="btn btn-primary" id="relExportCsv"><i class="fas fa-file-csv"></i> Exportar dados (CSV)</button>
+              <button class="btn btn-ghost" id="relExportPdf"><i class="fas fa-file-pdf"></i> Gerar relatório PDF</button>
+              <button class="btn btn-ghost" id="relExportPng"><i class="fas fa-image"></i> Baixar PNG</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-3);"><i class="fas fa-info-circle" style="color:var(--info);"></i> O PDF inclui indicadores, gráficos capturados e resumo baseado nos filtros ativos. O PNG exporta um snapshot do resumo executivo e status dos indicadores.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── DETAIL MODAL ─────────────────────── -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="detailTitle">Detalhes do Acionamento</h3>
+      <button class="icon-btn" id="closeDetail" style="width:32px;height:32px;font-size:14px;"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" id="closeDetail2">Fechar</button></div>
+  </div>
+</div>
+
+<!-- ── CHART MODAL ──────────────────────── -->
+<div class="modal-overlay" id="chartModal">
+  <div class="modal-box" id="chartModalBox">
+    <div class="modal-header">
+      <h3 id="chartModalTitle">Gráfico</h3>
+      <button class="icon-btn" id="closeChart" style="width:32px;height:32px;font-size:14px;"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="chart-wrap" style="height:440px;"><canvas id="cModal"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PDF MODAL ───────────────────────── -->
+<div class="modal-overlay" id="pdfModal">
+  <div class="modal-box" style="max-width:720px;">
+    <div class="modal-header">
+      <h3>Pré-visualização do Relatório</h3>
+      <button class="icon-btn" id="closePdf" style="width:32px;height:32px;font-size:14px;"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="pdfPreview" style="font-size:13px;line-height:1.7;color:#1a202c;max-height:65vh;overflow-y:auto;"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="closePdf2">Fechar</button>
+      <button class="btn btn-primary" id="btnGeneratePdf"><i class="fas fa-file-pdf"></i> Gerar PDF</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ─────────────────────────────── GLOBALS ──────────────────────── */
+let ALL = [], FILTERED = [];
+let sortCol = 'dataSort', sortDir = 'desc', searchQ = '', page = 1;
+const PER_PAGE = 12;
+let CHARTS = {};
+let TABS_BUILT = {};
+let DATA_QUALITY = {};
+
+/* ─────────────────────────────── CHART DEFAULTS ───────────────── */
+Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif";
+Chart.defaults.font.size   = 12;
+Chart.defaults.color       = '#64748b';
+
+const P = {  /* palette */
+  blue:   '#1a75bc', blueL:  'rgba(26,117,188,.12)',
+  green:  '#00a859', greenL: 'rgba(0,168,89,.12)',
+  red:    '#dc2626', redL:   'rgba(220,38,38,.1)',
+  amber:  '#d97706', amberL: 'rgba(217,119,6,.1)',
+  teal:   '#0891b2', sky:    '#0284c7',
+  gray:   '#94a3b8', grayL:  'rgba(148,163,184,.15)',
+};
+const COMPANY_COLORS = ['#1a75bc','#00a859','#0891b2','#7c3aed','#be185d','#b45309','#0f766e','#1d4ed8','#15803d','#9f1239'];
+
+/* ─────────────────────────────── PARSE HELPERS ─────────────────── */
+function nk(obj) {   /* normalize keys: remove NBSP (U+00A0) and U+FFFD (encoding replacement char) */
+  const r = {};
+  for (const [k,v] of Object.entries(obj))
+    r[k.replace(/[\u00a0\ufffd]/g, ' ').trim()] = (v||'').trim();
+  return r;
+}
+
+function parseDateBR(s) {   /* DD/MM/YYYY */
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const d = new Date(+p[2], +p[1]-1, +p[0]);
+  return isNaN(d) ? null : d;
+}
+
+function parseDateUS(s) {   /* M/D/YYYY (form export format) */
+  if (!s) return null;
+  const p = s.split('/');
+  if (p.length !== 3) return null;
+  const d = new Date(+p[2], +p[0]-1, +p[1]);
+  return isNaN(d) ? null : d;
+}
+
+function parseDateTime(s) {  /* DD/MM/YYYY HH:mm */
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +(m[6]||0));
+}
+
+function parseHora(s) {    /* HH:MM or HH:MM:SS */
+  if (!s) return null;
+  const p = s.split(':').map(Number);
+  if (p.length < 2 || isNaN(p[0]) || isNaN(p[1])) return null;
+  if (p[0] > 23 || p[0] < 0 || p[1] > 59) return null;  /* filter hour=29 bug */
+  return { h: p[0], m: p[1], s: p[2]||0 };
+}
+
+/* ─────────────────────────────── BOOL NORMALIZER ───────────────── */
+function isYes(v)  { return ['SIM','S','1','TRUE'].includes((v||'').toUpperCase().trim()); }
+function isNo(v)   { return ['NÃO','NAO','N','0','FALSE'].includes((v||'').toUpperCase().trim()); }
+
+/* ─────────────────────────────── FIELD KEYS ────────────────────── */
+const F = {
+  id:        'Id',
+  hrIni:     'Hora de início',
+  hrFim:     'Hora de conclusão',
+  email:     'Email',
+  nome:      'Nome',
+  sistema:   'Sistema',
+  empresa:   'EMPRESA',
+  dataAcio:  'Data acionamento',
+  hrAtenIni: 'Hora início atendimento',
+  dataFinal: 'Data final acionamento',
+  hrFinal:   'Hora final acionamento',
+  area:      'Área solicitante (qual área acinou o time SCADA)?',
+  nomeSolic: 'Nome solicitante',
+  ocorren:   'Dados da Ocorrência',
+  registro:  'Registro do atendimento',
+  interviu:  'Foi necessário alguma intervenção do time SCADA?',
+  resolScada:'O problema foi solucionado APENAS com o time SCADA?',
+  outraEq:   'Foi necessário acionar outra equipe?',
+  qualEq:    'Se sim para a pergunta anterior, qual equipe acionada?',
+  resolEq:   'O problema foi solucionado com o atendimento da outra equipe?',
+  necessario:'Foi realmente necessário o acionamento para o time SCADA?',
+  obs:       'Demais observações',
+};
+
+/* ─────────────────────────────── AREA NORMALIZATION ─────────────── */
+/* Normalize fragmented area values to canonical names */
+function normalizeArea(raw) {
+  const s = (raw||'').trim();
+  if (!s || s === 'NA' || s === 'N/A') return 'Não informado';
+  // SCADA internal noise
+  if (/^(Rebeca SCADA|TESTE|SCADA[\s\-\/].*|SCADA$|SCADA ADMS)$/i.test(s)) return 'Outros';
+  return s;
+}
+
+/* ─────────────────────────────── PROCESS ROW ───────────────────── */
+function processRow(raw) {
+  const r = nk(raw);
+
+  const item = {
+    ...r,
+    EMPRESA:       (r[F.empresa]||'Não informado').trim(),
+    Sistema:       (r[F.sistema]||'Não informado').trim(),
+    Nome:          (r[F.nome]||'Não informado').trim(),
+    AreaSolic:     normalizeArea(r[F.area]),
+    intervencao:   isYes(r[F.interviu]),
+    resolvidoScada:isYes(r[F.resolScada]),
+    outraEquipe:   isYes(r[F.outraEq]),
+    indevido:      isNo(r[F.necessario]),
+    necessario:    (r[F.necessario]||'').trim(),
+  };
+
+  item.Status = item.resolvidoScada ? 'Resolvido' :
+                item.outraEquipe   ? 'Outra equipe' : 'Não resolvido';
+
+  /* Sortable date */
+  const d = parseDateBR(r[F.dataAcio]);
+  item.dataSort = d ? d.getTime() : 0;
+  item.monthKey = d ? `${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : null;
+
+  /* Hora acionamento (for heatmap) */
+  const ha = parseHora(r[F.hrAtenIni]);
+  item.horaAcionamento = ha ? ha.h : null;
+
+  /* Sobreaviso duration — uses Hora de início / Hora de conclusão (DD/MM/YYYY HH:mm) */
+  item.duracaoSob = null;
+  const hi = parseDateTime(r[F.hrIni]);
+  const hf = parseDateTime(r[F.hrFim]);
+  if (hi && hf) {
+    const h = (hf - hi) / 3600000;
+    if (h > 0 && h < 24) item.duracaoSob = h;
+  }
+
+  /* Response time: Data acionamento + Hora início atend → Data final (M/D/YYYY) + Hora final
+     NOTE: 4 records have data-entry errors with reversed dates (IDs 36,52,85,109) — correctly
+     filtered out by the >0 guard. 3 records exceed 24h (multi-day escalations) — filtered by <1440. */
+  item.tempoResposta = null;
+  const da = parseDateBR(r[F.dataAcio]);
+  const ho = parseHora(r[F.hrAtenIni]);
+  const df = parseDateUS(r[F.dataFinal]);    /* M/D/YYYY confirmed for all valid rows */
+  const hfin = parseHora(r[F.hrFinal]);
+
+  if (da && ho && df && hfin) {
+    const start = new Date(da.getFullYear(), da.getMonth(), da.getDate(), ho.h, ho.m, ho.s);
+    const end   = new Date(df.getFullYear(), df.getMonth(), df.getDate(), hfin.h, hfin.m, hfin.s);
+    const min = (end - start) / 60000;
+    if (min > 0 && min < 1440) item.tempoResposta = min;
+  }
+
+  return item;
+}
+
+/* ─────────────────────────────── DATA QUALITY ──────────────────── */
+function computeDataQuality(items) {
+  const total = items.length;
+  const withTime = items.filter(d => d.tempoResposta !== null).length;
+  const withSob  = items.filter(d => d.duracaoSob  !== null).length;
+  const withHour = items.filter(d => d.horaAcionamento !== null).length;
+  const emptyArea = items.filter(d => d.AreaSolic === 'Não informado').length;
+  const errorTime = items.filter(d => {
+    /* Detect rows where both dates exist but time was invalid (outlier) */
+    return d[F.dataAcio] && d[F.hrAtenIni] && d[F.dataFinal] && d[F.hrFinal] && d.tempoResposta === null;
+  }).length;
+  DATA_QUALITY = { total, withTime, withSob, withHour, emptyArea, errorTime };
+}
+
+/* ─────────────────────────────── FILTER INIT ───────────────────── */
+function fillSelect(id, vals, dflt) {
+  const sel = document.getElementById(id);
+  const sorted = [...new Set(vals.filter(Boolean))].sort();
+  sel.innerHTML = `<option value="">${dflt}</option>` + sorted.map(v => `<option value="${escH(v)}">${escH(v)}</option>`).join('');
+}
+
+function initFilters() {
+  fillSelect('fSistema',     ALL.map(d=>d.Sistema).filter(s=>s!=='Não informado'),  'Todos');
+  fillSelect('fEmpresa',     ALL.map(d=>d.EMPRESA),  'Todas');
+  fillSelect('fColaborador', ALL.map(d=>d.Nome).filter(n=>n!=='Não informado'), 'Todos');
+  fillSelect('fArea',        ALL.map(d=>d.AreaSolic).filter(a=>a!=='Outros'&&a!=='Não informado'), 'Todas');
+  /* Date range */
+  const datas = ALL.map(d=>parseDateBR(d[F.dataAcio])).filter(Boolean);
+  if (datas.length) {
+    const mn = new Date(Math.min(...datas)), mx = new Date(Math.max(...datas));
+    document.getElementById('fDtIni').value = fmt(mn);
+    document.getElementById('fDtFim').value = fmt(mx);
+  }
+}
+function fmt(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+/* ─────────────────────────────── APPLY FILTERS ─────────────────── */
+function applyFilters() {
+  const sis = v('fSistema'), emp = v('fEmpresa'), col = v('fColaborador'),
+        are = v('fArea'), nec = v('fNecessario'),
+        di  = document.getElementById('fDtIni').value,
+        df  = document.getElementById('fDtFim').value;
+  const dtI = di ? new Date(di) : null;
+  const dtF = df ? new Date(df+'T23:59:59') : null;
+
+  FILTERED = ALL.filter(d => {
+    if (sis && d.Sistema  !== sis) return false;
+    if (emp && d.EMPRESA  !== emp) return false;
+    if (col && d.Nome     !== col) return false;
+    if (are && d.AreaSolic!== are) return false;
+    if (nec) {
+      if (nec === 'SIM' && d.indevido) return false;
+      if (nec === 'NÃO' && !d.indevido) return false;
+    }
+    if (dtI || dtF) {
+      const dd = parseDateBR(d[F.dataAcio]);
+      if (dd) { if (dtI && dd < dtI) return false; if (dtF && dd > dtF) return false; }
+    }
+    return true;
+  });
+
+  page = 1;
+  updateKPIs();
+  buildDashCharts();
+  buildDataQualityPanel();
+  buildTable();
+  buildInsights();
+  if (TABS_BUILT.performance) buildPerformance();
+  if (TABS_BUILT.tendencias)  buildTendencias();
+  if (TABS_BUILT.relatorios)  buildRelatorios();
+}
+
+function clearFilters() {
+  ['fSistema','fEmpresa','fColaborador','fArea','fNecessario'].forEach(id => {document.getElementById(id).value='';});
+  initFilters(); applyFilters();
+}
+
+/* ─────────────────────────────── KPIs ──────────────────────────── */
+function lastTwoMonths(base) {
+  const map = {};
+  base.forEach(d => { if (d.monthKey) { if (!map[d.monthKey]) map[d.monthKey]=[]; map[d.monthKey].push(d); } });
+  const keys = Object.keys(map).sort();
+  return { cur: map[keys[keys.length-1]]||[], prev: map[keys[keys.length-2]]||[] };
+}
+
+function trendHTML(cur, prev) {
+  if (!prev || !prev.length) return '';
+  const pct = Math.round(((cur-prev)/prev)*100);
+  if (pct > 0)  return `<span class="trend trend-up"><i class="fas fa-arrow-up"></i> ${pct}%</span>`;
+  if (pct < 0)  return `<span class="trend trend-down"><i class="fas fa-arrow-down"></i> ${Math.abs(pct)}%</span>`;
+  return `<span class="trend trend-flat">— 0%</span>`;
+}
+
+function updateKPIs() {
+  const B = FILTERED, total = B.length;
+  if (!total) return;
+  const { cur, prev } = lastTwoMonths(ALL);
+
+  /* Total */
+  set('kTotal', total);
+  set('trendTotal', trendHTML(cur.length, prev.length));
+
+  /* Resolução */
+  const resol = B.filter(d=>d.resolvidoScada).length;
+  const resolPct = total ? Math.round(resol/total*100) : 0;
+  set('kResol', resolPct+'%');
+  const curResol  = cur.length ? Math.round(cur.filter(d=>d.resolvidoScada).length/cur.length*100) : 0;
+  const prevResol = prev.length? Math.round(prev.filter(d=>d.resolvidoScada).length/prev.length*100): 0;
+  set('trendResol', trendHTML(curResol, prevResol));
+
+  /* Tempo */
+  const tempos = B.map(d=>d.tempoResposta).filter(v=>v!==null);
+  const tm = tempos.length ? Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length) : null;
+  const elTempo = document.getElementById('kTempo');
+  elTempo.textContent = tm !== null ? tm+' min' : 'N/D';
+  const meta = document.getElementById('kTempoMeta');
+  if (tm !== null) {
+    const badge = tm <= 45 ? `<span class="sla-badge sla-ok"><i class="fas fa-check"></i> Dentro do SLA</span>`
+                : tm <= 60 ? `<span class="sla-badge sla-warn"><i class="fas fa-exclamation"></i> Próximo do SLA</span>`
+                : `<span class="sla-badge sla-bad"><i class="fas fa-times"></i> SLA violado</span>`;
+    meta.innerHTML = badge + `<span style="margin-left:6px;color:var(--text-3);">SLA: 60 min</span>`;
+  } else {
+    meta.innerHTML = `<span class="sla-badge" style="background:var(--surface-2);color:var(--text-3);">Sem dados suficientes</span>`;
+  }
+
+  /* Indevidos */
+  const indev = B.filter(d=>d.indevido).length;
+  const indevPct = total ? Math.round(indev/total*100) : 0;
+  set('kIndev', indevPct+'%');
+  const curIndev  = cur.length ? Math.round(cur.filter(d=>d.indevido).length/cur.length*100) : 0;
+  const prevIndev = prev.length? Math.round(prev.filter(d=>d.indevido).length/prev.length*100): 0;
+  set('trendIndev', trendHTML(curIndev, prevIndev));
+
+  /* Somente SCADA */
+  const solo = B.filter(d=>d.resolvidoScada && !d.outraEquipe).length;
+  set('kSolo', solo);
+  set('kSoloPct', total ? `${Math.round(solo/total*100)}%` : '0%');
+
+  /* SLA Compliance (% de casos dentro de 60 min) */
+  const slaCases = tempos.filter(t=>t<=60).length;
+  const slaPct   = tempos.length ? Math.round(slaCases/tempos.length*100) : null;
+  if (slaPct !== null) {
+    set('kSLA', slaPct+'%');
+    const slaBadge = slaPct >= 80
+      ? `<span style="color:var(--success);font-size:11px;font-weight:600;"><i class="fas fa-check-circle"></i> Meta atingida</span>`
+      : slaPct >= 60
+        ? `<span style="color:var(--warning);font-size:11px;font-weight:600;"><i class="fas fa-exclamation-circle"></i> Atenção</span>`
+        : `<span style="color:var(--danger);font-size:11px;font-weight:600;"><i class="fas fa-times-circle"></i> Crítico</span>`;
+    set('kSLAsub', slaBadge + `<span style="color:var(--text-3);font-size:11px;"> de ${tempos.length} casos</span>`);
+  } else {
+    set('kSLA', 'N/D');
+    set('kSLAsub', '<span style="color:var(--text-3);font-size:11px;">Sem dados de tempo</span>');
+  }
+}
+
+/* ─────────────────────────────── DATA QUALITY PANEL ────────────── */
+function buildDataQualityPanel() {
+  const DQ = DATA_QUALITY;
+  const B = FILTERED;
+  const total = B.length;
+
+  const withTime = B.filter(d=>d.tempoResposta!==null).length;
+  const withSob  = B.filter(d=>d.duracaoSob!==null).length;
+  const withHour = B.filter(d=>d.horaAcionamento!==null).length;
+  const emptyArea = B.filter(d=>d.AreaSolic==='Não informado').length;
+
+  document.getElementById('dqPanel').innerHTML = [
+    {n: withTime,           l: 'Com tempo de resposta', sub: `${Math.round(withTime/total*100)}% dos registros`},
+    {n: withSob,            l: 'Com duração sobreaviso', sub: `${Math.round(withSob/total*100)}% dos registros`},
+    {n: withHour,           l: 'Com hora de acionamento', sub: `${Math.round(withHour/total*100)}% dos registros`},
+    {n: total - emptyArea,  l: 'Com área informada', sub: `${emptyArea} sem área definida`},
+  ].map(({n,l,sub}) => `
+    <div class="dq-item">
+      <div class="dq-num" style="color:${n/total>=.9?'var(--success)':n/total>=.7?'var(--warning)':'var(--danger)'}">${n}</div>
+      <div class="dq-label">${l}</div>
+      <div class="dq-sub">${sub}</div>
+    </div>`).join('');
+
+  /* Alerts for known data errors */
+  const alerts = [];
+  if (DQ.errorTime > 0) alerts.push(`<div class="notice notice-warning" style="margin-bottom:6px;font-size:12px;"><i class="fas fa-exclamation-triangle"></i> <strong>${DQ.errorTime} registros</strong> com datas inconsistentes (tempo negativo ou >24h) foram descartados do cálculo de tempo de resposta.</div>`);
+  const noSistema = B.filter(d=>!d.Sistema||d.Sistema==='Não informado').length;
+  if (noSistema > 0) alerts.push(`<div class="notice notice-warning" style="margin-bottom:6px;font-size:12px;"><i class="fas fa-info-circle"></i> <strong>${noSistema} registros</strong> sem sistema informado.</div>`);
+  document.getElementById('dqAlerts').innerHTML = alerts.join('');
+}
+
+/* ─────────────────────────────── INSIGHTS ──────────────────────── */
+function buildInsights() {
+  const B = FILTERED, total = B.length;
+  const container = document.getElementById('insightContainer');
+  container.innerHTML = '';
+  if (!total) { container.innerHTML = '<p style="color:var(--text-3);font-size:13px;">Sem dados disponíveis.</p>'; return; }
+
+  const resol = B.filter(d=>d.resolvidoScada).length/total*100;
+  const indev = B.filter(d=>d.indevido).length/total*100;
+  const tempos = B.map(d=>d.tempoResposta).filter(v=>v!==null);
+  const tm = tempos.length ? tempos.reduce((a,b)=>a+b,0)/tempos.length : null;
+  const slaPct = tempos.length ? tempos.filter(t=>t<=60).length/tempos.length*100 : null;
+
+  const add = (tipo, title, desc) => {
+    const icons = {pos:'check-circle', warn:'exclamation-triangle', neg:'times-circle', info:'info-circle'};
+    const cls   = {pos:'i-pos', warn:'i-warn', neg:'i-neg', info:'i-info'};
+    container.insertAdjacentHTML('beforeend',
+      `<div class="insight fade-up">
+         <div class="insight-dot ${cls[tipo]}"><i class="fas fa-${icons[tipo]}"></i></div>
+         <div><div class="insight-title">${title}</div><div class="insight-desc">${desc}</div></div>
+       </div>`);
+  };
+
+  resol>=85 ? add('pos','Taxa de resolução acima da meta',`${Math.round(resol)}% dos acionamentos resolvidos pelo SCADA — meta de 85% atingida.`)
+            : resol>=60 ? add('warn','Taxa de resolução abaixo da meta',`${Math.round(resol)}% de resolução. Faltam ${Math.round(85-resol)} pontos percentuais para a meta.`)
+            : add('neg','Taxa de resolução crítica',`Apenas ${Math.round(resol)}% resolvidos. Revisão urgente de processos.`);
+
+  indev>30  ? add('neg','Alto volume de acionamentos indevidos',`${Math.round(indev)}% dos casos (${B.filter(d=>d.indevido).length}) não eram necessários para o SCADA. Impacto financeiro direto no custo de sobreaviso.`)
+            : indev>15 ? add('warn','Acionamentos indevidos acima da meta',`${Math.round(indev)}% indevidos — meta é <15%. Capacitação das áreas solicitantes pode reduzir esses custos.`)
+            : add('pos','Acionamentos indevidos sob controle',`Apenas ${Math.round(indev)}% indevidos, dentro da meta de 15%.`);
+
+  /* SLA compliance insight */
+  if (slaPct !== null) {
+    slaPct>=80 ? add('pos','Conformidade de SLA satisfatória',`${Math.round(slaPct)}% dos acionamentos atendidos em até 60 min — meta de 80% atingida.`)
+    : slaPct>=60 ? add('warn','Conformidade de SLA abaixo do esperado',`Apenas ${Math.round(slaPct)}% dos casos dentro do SLA de 60 min. ${Math.round(100-slaPct)}% excederam o prazo.`)
+    : add('neg','SLA gravemente comprometido',`Apenas ${Math.round(slaPct)}% dos casos foram atendidos dentro de 60 min. Ação corretiva urgente necessária.`);
+  }
+
+  if (tm !== null) {
+    tm<=45  ? add('pos','Tempo de resposta excelente',`Média de ${Math.round(tm)} min — ${Math.round(60-tm)} min abaixo do SLA de 60 min.`)
+    : tm<=60 ? add('info','Dentro do SLA',`Média de ${Math.round(tm)} min — dentro do SLA. Monitorar para não ultrapassar.`)
+    : add('neg','SLA de tempo violado',`Média de ${Math.round(tm)} min excede o SLA em ${Math.round(tm-60)} min. Identificar gargalos operacionais.`);
+  } else {
+    add('warn','Dados de tempo incompletos',`${DATA_QUALITY.withTime} de ${DATA_QUALITY.total} registros possuem tempo de resposta calculável. Verifique o preenchimento dos campos de horário.`);
+  }
+
+  /* Sistema insight */
+  const sisMap = {};
+  B.forEach(d=>{
+    const s = d.Sistema||'Não informado';
+    if (!sisMap[s]) sisMap[s]={total:0,resol:0,indev:0};
+    sisMap[s].total++;
+    if (d.resolvidoScada) sisMap[s].resol++;
+    if (d.indevido) sisMap[s].indev++;
+  });
+  const sisEntries = Object.entries(sisMap).filter(([,v])=>v.total>=5);
+  if (sisEntries.length > 1) {
+    const worstSis = sisEntries.sort((a,b)=>(b[1].indev/b[1].total)-(a[1].indev/a[1].total))[0];
+    add('info','Sistema com mais indevidos',`"${worstSis[0]}" tem ${Math.round(worstSis[1].indev/worstSis[1].total*100)}% de acionamentos indevidos (${worstSis[1].indev} casos).`);
+  }
+
+  /* Top indevido area */
+  const aMap = {};
+  B.filter(d=>d.indevido).forEach(d=>{aMap[d.AreaSolic]=(aMap[d.AreaSolic]||0)+1;});
+  const topA = Object.entries(aMap).sort((a,b)=>b[1]-a[1])[0];
+  if (topA && topA[1]>=3) add('info','Área com mais acionamentos indevidos',`"${topA[0]}" gerou ${topA[1]} acionamentos classificados como não necessários. Priorizar capacitação desta área.`);
+
+  /* Noturno */
+  const noturno = B.filter(d=>d.horaAcionamento!==null&&(d.horaAcionamento>=18||d.horaAcionamento<6)).length;
+  const pctNot = Math.round(noturno/total*100);
+  if (pctNot>40) add('info','Alta concentração noturna',`${pctNot}% dos acionamentos ocorrem fora do horário comercial (18h–6h). Avaliar dimensionamento da escala de sobreaviso.`);
+}
+
+/* ─────────────────────────────── CHARTS: DASHBOARD ─────────────── */
+function destroyChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+function buildDashCharts() {
+  const B = FILTERED;
+  buildEmpresaChart(B);
+  buildHorasChart(B);
+  buildTempoChart(B);
+  buildSistemaChart(B);
+}
+
+function buildEmpresaChart(B) {
+  destroyChart('cEmpresa');
+  const empMap = {};
+  B.forEach(d=>{
+    if (!empMap[d.EMPRESA]) empMap[d.EMPRESA]={total:0,resol:0,indev:0};
+    empMap[d.EMPRESA].total++;
+    if (d.resolvidoScada) empMap[d.EMPRESA].resol++;
+    if (d.indevido)       empMap[d.EMPRESA].indev++;
+  });
+  const sorted = Object.entries(empMap).sort((a,b)=>b[1].total-a[1].total);
+  const labels = sorted.map(([e])=>e);
+  CHARTS.cEmpresa = new Chart(g('cEmpresa'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      {label:'Resolvido SCADA', data:sorted.map(([,v])=>v.resol),    backgroundColor:P.green,  borderRadius:4, borderSkipped:false},
+      {label:'Indevido',        data:sorted.map(([,v])=>v.indev),    backgroundColor:P.red,    borderRadius:4, borderSkipped:false},
+      {label:'Outros',          data:sorted.map(([,v])=>v.total-v.resol-v.indev), backgroundColor:P.gray, borderRadius:4, borderSkipped:false},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, beginAtZero:true, grid:{color:'rgba(0,0,0,.04)'}} },
+      plugins:{ legend:{position:'top', labels:{boxWidth:10, padding:14, font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`}}
+      }
+    }
+  });
+}
+
+function buildSistemaChart(B) {
+  destroyChart('cSistema');
+  const sisMap = {};
+  B.forEach(d=>{
+    const s = d.Sistema||'Não informado';
+    if (!sisMap[s]) sisMap[s]={total:0,resol:0,indev:0};
+    sisMap[s].total++;
+    if (d.resolvidoScada) sisMap[s].resol++;
+    if (d.indevido) sisMap[s].indev++;
+  });
+  const sorted = Object.entries(sisMap).sort((a,b)=>b[1].total-a[1].total);
+  const labels = sorted.map(([s])=>s);
+  CHARTS.cSistema = new Chart(g('cSistema'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      {label:'Resolvido SCADA', data:sorted.map(([,v])=>v.resol),    backgroundColor:P.green,  borderRadius:4, borderSkipped:false},
+      {label:'Indevido',        data:sorted.map(([,v])=>v.indev),    backgroundColor:P.red,    borderRadius:4, borderSkipped:false},
+      {label:'Outros',          data:sorted.map(([,v])=>v.total-v.resol-v.indev), backgroundColor:P.gray, borderRadius:4, borderSkipped:false},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, beginAtZero:true, grid:{color:'rgba(0,0,0,.04)'}} },
+      plugins:{ legend:{position:'top', labels:{boxWidth:10, padding:14, font:{size:11}}},
+        tooltip:{callbacks:{
+          label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,
+          afterBody: (items) => {
+            const sis = sorted[items[0]?.dataIndex];
+            if (!sis) return [];
+            const [,v] = sis;
+            return [`Taxa resolução: ${v.total?Math.round(v.resol/v.total*100):0}%`, `Taxa indevidos: ${v.total?Math.round(v.indev/v.total*100):0}%`];
+          }
+        }}
+      }
+    }
+  });
+}
+
+function buildHorasChart(B) {
+  destroyChart('cHoras');
+  const meses = {};
+  B.forEach(d=>{
+    const p = d[F.dataAcio]?.split('/');
+    if (p?.length===3) {
+      const k = `${p[1]}/${p[2]}`;
+      if (!meses[k]) meses[k]={tot:0,ind:0};
+      const dur = d.duracaoSob || 0.5;
+      meses[k].tot += dur;
+      if (d.indevido) meses[k].ind += dur;
+    }
+  });
+  const labels = Object.keys(meses).sort((a,b)=>{ const [ma,ya]=a.split('/').map(Number),[mb,yb]=b.split('/').map(Number); return new Date(ya,ma-1)-new Date(yb,mb-1); });
+  const tots = labels.map(k=>+meses[k].tot.toFixed(1));
+  const inds = labels.map(k=>+meses[k].ind.toFixed(1));
+  const pcts = labels.map((_,i)=>tots[i]>0?+(inds[i]/tots[i]*100).toFixed(1):0);
+  CHARTS.cHoras = new Chart(g('cHoras'), {
+    type: 'bar',   /* ← FIX: required top-level type for mixed charts in Chart.js 4 */
+    data:{ labels, datasets:[
+      {type:'bar',  label:'Total (h)',    data:tots, backgroundColor:P.blueL,  borderColor:P.blue,  borderWidth:1.5, borderRadius:4, yAxisID:'y'},
+      {type:'bar',  label:'Indevidas (h)',data:inds, backgroundColor:'rgba(220,38,38,.2)', borderColor:P.red, borderWidth:1.5, borderRadius:4, yAxisID:'y'},
+      {type:'line', label:'% Indevidas',  data:pcts, borderColor:P.amber, borderWidth:2, fill:false, tension:.4, yAxisID:'y1',
+       pointBackgroundColor:P.amber, pointRadius:3, pointHoverRadius:5},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      scales:{
+        x:{grid:{display:false}},
+        y:{position:'left', beginAtZero:true, grid:{color:'rgba(0,0,0,.04)'}, title:{display:true,text:'Horas',font:{size:11}}},
+        y1:{position:'right', min:0, max:100, grid:{drawOnChartArea:false}, title:{display:true,text:'%',font:{size:11}},
+            ticks:{callback: v=>v+'%'}}
+      },
+      plugins:{legend:{position:'top',labels:{boxWidth:10,padding:14,font:{size:11}}}}
+    }
+  });
+}
+
+function buildTempoChart(B) {
+  destroyChart('cTempo');
+  const dmap = {};
+  B.forEach(d=>{ const da=d[F.dataAcio]; if(da) dmap[da]=(dmap[da]||0)+1; });
+  const labels = Object.keys(dmap).sort((a,b)=>{const pa=a.split('/'),pb=b.split('/');return new Date(+pa[2],+pa[1]-1,+pa[0])-new Date(+pb[2],+pb[1]-1,+pb[0]);});
+  CHARTS.cTempo = new Chart(g('cTempo'), {
+    type:'line',
+    data:{ labels, datasets:[{label:'Acionamentos', data:labels.map(d=>dmap[d]),
+      borderColor:P.blue, backgroundColor:P.blueL, fill:true, tension:.45,
+      pointRadius:2, pointHoverRadius:5, borderWidth:2}]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}, ticks:{maxTicksLimit:10}}, y:{beginAtZero:true, grid:{color:'rgba(0,0,0,.04)'}} },
+      plugins:{ legend:{display:false} }
+    }
+  });
+}
+
+/* ─────────────────────────────── CHARTS: PERFORMANCE ───────────── */
+function buildPerformance() {
+  const B = FILTERED;
+  buildColabChart(B);
+  buildHeatmapChart(B);
+  buildRanking(B);
+}
+
+function buildColabChart(B) {
+  destroyChart('cColabs');
+  const nomes = [...new Set(B.map(d=>d.Nome).filter(n=>n&&n!=='Não informado'))];
+  const stats = nomes.map((nome,i)=>{
+    const items = B.filter(d=>d.Nome===nome);
+    const tot=items.length, resol=items.filter(d=>d.resolvidoScada).length, ind=items.filter(d=>d.indevido).length;
+    return { nome, tot, resolPct:tot?Math.round(resol/tot*100):0, indPct:tot?Math.round(ind/tot*100):0, color:COMPANY_COLORS[i%COMPANY_COLORS.length] };
+  }).filter(s=>s.tot>=2);
+  CHARTS.cColabs = new Chart(g('cColabs'), {
+    type:'bubble',
+    data:{ datasets: stats.map(s=>({
+      label:s.nome,
+      data:[{x:s.tot, y:s.resolPct, r:Math.max(7, s.indPct*0.4+5)}],
+      backgroundColor:hexA(s.color,.65), borderColor:s.color, borderWidth:2
+    }))},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,.04)'}, title:{display:true,text:'Volume de Acionamentos',font:{size:11}}, beginAtZero:true},
+        y:{grid:{color:'rgba(0,0,0,.04)'}, title:{display:true,text:'Taxa de Resolução SCADA (%)',font:{size:11}}, min:0, max:105}
+      },
+      plugins:{legend:{position:'right',labels:{boxWidth:10,font:{size:11}}},
+        tooltip:{callbacks:{label(ctx){
+          const s=stats.find(x=>x.nome===ctx.dataset.label);
+          return s?[s.nome,`Volume: ${s.tot}`,`Resolução: ${s.resolPct}%`,`Indevidos: ${s.indPct}%`]:[];
+        }}}
+      }
+    }
+  });
+}
+
+function buildHeatmapChart(B) {
+  destroyChart('cHoras24');
+  const counts = new Array(24).fill(0);
+  B.forEach(d=>{ if(d.horaAcionamento!==null) counts[d.horaAcionamento]++; });
+  const maxC = Math.max(...counts, 1);
+  const bgs = counts.map(c=>{
+    const r=c/maxC;
+    return r>.7?'rgba(220,38,38,.85)':r>.45?'rgba(217,119,6,.80)':r>.2?'rgba(26,117,188,.65)':'rgba(148,163,184,.35)';
+  });
+  CHARTS.cHoras24 = new Chart(g('cHoras24'), {
+    type:'bar',
+    data:{ labels:Array.from({length:24},(_,i)=>`${i}h`),
+      datasets:[{label:'Acionamentos', data:counts, backgroundColor:bgs, borderRadius:5, borderSkipped:false}]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:'rgba(0,0,0,.04)'}} },
+      plugins:{ legend:{display:false} }
+    }
+  });
+  const peakH = counts.indexOf(maxC);
+  const noturn = counts.slice(18).reduce((a,b)=>a+b,0)+counts.slice(0,6).reduce((a,b)=>a+b,0);
+  const pctN = B.length ? Math.round(noturn/B.length*100):0;
+  document.getElementById('peakInfo').innerHTML =
+    `<span class="badge badge-danger"><i class="fas fa-fire"></i> Pico: ${peakH}h (${maxC} acionamentos)</span>
+     <span class="badge badge-info"><i class="fas fa-moon"></i> ${pctN}% fora do horário comercial</span>`;
+}
+
+function buildRanking(B) {
+  const nomes = [...new Set(B.map(d=>d.Nome).filter(n=>n&&n!=='Não informado'))];
+  const stats = nomes.map(nome=>{
+    const items=B.filter(d=>d.Nome===nome), tot=items.length;
+    const tempos=items.map(d=>d.tempoResposta).filter(v=>v!==null);
+    return { nome, tot, resolPct:tot?Math.round(items.filter(d=>d.resolvidoScada).length/tot*100):0,
+             indPct:tot?Math.round(items.filter(d=>d.indevido).length/tot*100):0,
+             avgTime:tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):null };
+  }).sort((a,b)=>b.resolPct-a.resolPct);
+  const rCls=['r1','r2','r3'];
+  document.getElementById('rankingList').innerHTML = stats.map((s,i)=>
+    `<div class="ranking-row">
+       <div class="rank-num ${rCls[i]||'rn'}">${i+1}</div>
+       <div class="rank-name" style="font-size:12.5px;">${escH(s.nome)}</div>
+       <div style="display:flex;align-items:center;gap:6px;font-size:11px;">
+         <span style="color:var(--success);font-weight:600;">${s.resolPct}%</span>
+         <div class="bar-wrap"><div class="bar-fill ${s.resolPct>=70?'bar-green':s.resolPct>=50?'bar-blue':'bar-warn'}" style="width:${s.resolPct}%"></div></div>
+       </div>
+       <span class="badge ${s.indPct>30?'badge-danger':s.indPct>15?'badge-warning':'badge-success'}" style="font-size:10px;">${s.indPct}% ind.</span>
+       ${s.avgTime!==null?`<span style="font-size:10px;color:var(--text-3);">${s.avgTime}min</span>`:''}
+     </div>`
+  ).join('');
+}
+
+/* ─────────────────────────────── CHARTS: TENDÊNCIAS ────────────── */
+function buildTendencias() {
+  const B = FILTERED;
+  buildMensalChart(B);
+  buildParetoChart(B);
+  buildDistTempoChart(B);
+}
+
+/* ── MENSAL CHART (V2) ─────────────────────────────────────────────
+   Improvement: stacked bars for volume breakdown (resolved / indevido /
+   other) + three % lines (resolução, indevidos, SLA compliance) on a
+   shared right Y-axis (0-100). Gives a rich monthly view in one chart.
+   The month key MM/YYYY is built from the BR date field (DD/MM/YYYY)
+   by extracting p[1] (month) and p[2] (year), which is correct.
+   Labels are sorted chronologically using Date comparison.           */
+function buildMensalChart(B) {
+  destroyChart('cMensal');
+  const meses = {};
+
+  B.forEach(d => {
+    const p = d[F.dataAcio]?.split('/');
+    if (p?.length !== 3) return;
+    /* p[0]=day  p[1]=month  p[2]=year  (DD/MM/YYYY) */
+    const k = `${p[1]}/${p[2]}`;          /* MM/YYYY */
+    if (!meses[k]) meses[k] = { tot:0, resol:0, indev:0, outros:0, tempos:[] };
+    meses[k].tot++;
+    if (d.resolvidoScada)                   meses[k].resol++;
+    else if (d.indevido)                    meses[k].indev++;
+    else                                    meses[k].outros++;
+    if (d.tempoResposta !== null)           meses[k].tempos.push(d.tempoResposta);
+  });
+
+  if (!Object.keys(meses).length) return;
+
+  const labels = Object.keys(meses).sort((a, b) => {
+    const [ma, ya] = a.split('/').map(Number);
+    const [mb, yb] = b.split('/').map(Number);
+    return new Date(ya, ma - 1) - new Date(yb, mb - 1);
+  });
+
+  /* Derived series */
+  const resolPcts = labels.map(k => meses[k].tot ? +(meses[k].resol / meses[k].tot * 100).toFixed(1) : 0);
+  const indevPcts = labels.map(k => meses[k].tot ? +(meses[k].indev / meses[k].tot * 100).toFixed(1) : 0);
+  const slaPcts   = labels.map(k => {
+    const t = meses[k].tempos;
+    return t.length ? +(t.filter(x => x <= 60).length / t.length * 100).toFixed(1) : null;
+  });
+  const avgTempos = labels.map(k => {
+    const t = meses[k].tempos;
+    return t.length ? +(t.reduce((a, b) => a + b, 0) / t.length).toFixed(1) : null;
+  });
+
+  CHARTS.cMensal = new Chart(g('cMensal'), {
+    type: 'bar',   /* default type required for mixed charts in Chart.js 4 */
+    data: {
+      labels,
+      datasets: [
+        /* Stacked volume bars (left Y axis) */
+        { type:'bar', label:'Resolvido SCADA', data: labels.map(k => meses[k].resol),
+          backgroundColor: 'rgba(0,168,89,.75)', borderColor: P.green, borderWidth: 1,
+          borderRadius: 3, borderSkipped: false, stack: 'vol', yAxisID: 'y' },
+        { type:'bar', label:'Indevido', data: labels.map(k => meses[k].indev),
+          backgroundColor: 'rgba(220,38,38,.65)', borderColor: P.red, borderWidth: 1,
+          borderRadius: 3, borderSkipped: false, stack: 'vol', yAxisID: 'y' },
+        { type:'bar', label:'Outros', data: labels.map(k => meses[k].outros),
+          backgroundColor: 'rgba(148,163,184,.55)', borderColor: P.gray, borderWidth: 1,
+          borderRadius: 3, borderSkipped: false, stack: 'vol', yAxisID: 'y' },
+        /* % lines (right Y axis) */
+        { type:'line', label:'Resolução SCADA (%)', data: resolPcts,
+          borderColor: P.green, borderWidth: 2.5, fill: false, tension: .35,
+          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: P.green,
+          yAxisID: 'y1', borderDash: [] },
+        { type:'line', label:'Indevidos (%)', data: indevPcts,
+          borderColor: P.red, borderWidth: 2, fill: false, tension: .35,
+          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: P.red,
+          yAxisID: 'y1', borderDash: [4, 3] },
+        { type:'line', label:'SLA ≤60 min (%)', data: slaPcts,
+          borderColor: P.sky, borderWidth: 2, fill: false, tension: .35,
+          pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: P.sky,
+          yAxisID: 'y1', borderDash: [6, 3], spanGaps: true },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { stacked: true, grid: { display: false },
+             ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { stacked: true, position: 'left', beginAtZero: true,
+             grid: { color: 'rgba(0,0,0,.04)' },
+             title: { display: true, text: 'Acionamentos', font: { size: 11 } } },
+        y1: { position: 'right', min: 0, max: 100,
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: '% (linhas)', font: { size: 11 } },
+              ticks: { callback: v => v + '%' } },
+      },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              if (v === null) return null;
+              const isBars = ctx.datasetIndex <= 2;
+              return ` ${ctx.dataset.label}: ${isBars ? v + ' casos' : v + '%'}`;
+            },
+            afterBody: items => {
+              const k = labels[items[0]?.dataIndex];
+              if (!k || !meses[k]) return [];
+              const t = meses[k].tempos;
+              return t.length ? [`  Tempo médio: ${(t.reduce((a,b)=>a+b,0)/t.length).toFixed(0)} min`] : [];
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/* ── PARETO CHART ──────────────────────────────────────────────────
+   BUG FIX: missing top-level `type:'bar'` caused Chart.js 4 to silently
+   refuse rendering mixed (bar + line) datasets. The `type` property is
+   REQUIRED at the chart level when mixing dataset types in Chart.js 4.
+   Without it, Chart.js cannot determine the default scale configuration
+   and produces a blank canvas with no error thrown in the console.      */
+function buildParetoChart(B) {
+  destroyChart('cPareto');
+  const amap = {};
+  B.forEach(d => {
+    const a = d.AreaSolic;
+    if (a && a !== 'Outros' && a !== 'Não informado') amap[a] = (amap[a] || 0) + 1;
+  });
+
+  if (!Object.keys(amap).length) return;   /* guard: empty data → skip render */
+
+  const sorted  = Object.entries(amap).sort((a, b) => b[1] - a[1]);
+  const labels  = sorted.map(([a]) => a);
+  const vals    = sorted.map(([, v]) => v);
+  const total   = vals.reduce((a, b) => a + b, 0);
+  let cs = 0;
+  const cumPct  = vals.map(v => { cs += v; return +(cs / total * 100).toFixed(1); });
+
+  CHARTS.cPareto = new Chart(g('cPareto'), {
+    type: 'bar',   /* ← FIX: required top-level type for mixed charts */
+    data: {
+      labels,
+      datasets: [
+        { type: 'bar',  label: 'Acionamentos', data: vals,
+          backgroundColor: P.blue, borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: '% Acumulado',  data: cumPct,
+          borderColor: P.amber, borderWidth: 2.5, fill: false, tension: .1,
+          yAxisID: 'y1', pointBackgroundColor: P.amber, pointRadius: 3,
+          pointHoverRadius: 5 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false } },
+        y: { position: 'left', beginAtZero: true,
+             grid: { color: 'rgba(0,0,0,.04)' },
+             title: { display: true, text: 'Acionamentos', font: { size: 11 } } },
+        y1: { position: 'right', min: 0, max: 100,
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: '% Acumulado', font: { size: 11 } },
+              ticks: { callback: v => v + '%' } },
+      },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, padding: 14, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.datasetIndex === 0
+              ? ` ${ctx.dataset.label}: ${ctx.raw} (${(ctx.raw/total*100).toFixed(1)}%)`
+              : ` % Acumulado: ${ctx.raw}%`,
+          },
+        },
+      },
+    },
+  });
+}
+
+/* ── DIST TEMPO CHART ──────────────────────────────────────────────
+   BUG: canvas was initialized while the parent container was still
+   display:none (lazy-tab pattern). Chart.js reads offsetWidth/Height
+   at init time; with 0×0 dimensions it renders invisibly. The fix is
+   at the call site (setTimeout instead of rAF — see buildTendencias).
+   Here we also guard against empty tempos array to avoid NaN in labels. */
+function buildDistTempoChart(B) {
+  destroyChart('cDistTempo');
+  const tempos = B.map(d => d.tempoResposta).filter(v => v !== null);
+
+  /* Always render the chart structure, even if empty */
+  const faixas = ['< 15 min', '15 – 30 min', '30 – 60 min', '60 – 120 min', '> 120 min'];
+  const counts = [0, 0, 0, 0, 0];
+  tempos.forEach(t => {
+    if      (t < 15)  counts[0]++;
+    else if (t < 30)  counts[1]++;
+    else if (t < 60)  counts[2]++;
+    else if (t < 120) counts[3]++;
+    else              counts[4]++;
+  });
+
+  const colors = [
+    'rgba(5,150,105,.85)',    /* < 15 min  → verde escuro */
+    'rgba(0,168,89,.70)',     /* 15–30 min → verde médio  */
+    'rgba(217,119,6,.80)',    /* 30–60 min → âmbar        */
+    'rgba(220,38,38,.80)',    /* 60–120    → vermelho      */
+    'rgba(153,27,27,.90)',    /* > 120 min → vermelho esc. */
+  ];
+
+  /* SLA reference annotation: line at x=2 (boundary <60 min) */
+  CHARTS.cDistTempo = new Chart(g('cDistTempo'), {
+    type: 'bar',
+    data: {
+      labels: faixas,
+      datasets: [{
+        label: 'Acionamentos',
+        data: counts,
+        backgroundColor: colors,
+        borderRadius: 6,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.04)' },
+             ticks: { precision: 0 } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `TMR — ${ctx[0].label}`,
+            label: ctx => tempos.length
+              ? ` ${ctx.raw} casos (${(ctx.raw / tempos.length * 100).toFixed(1)}%)`
+              : ` ${ctx.raw} casos`,
+            afterLabel: ctx => {
+              return ctx.dataIndex <= 2 ? '  ✓ Dentro do SLA (≤60 min)' : '  ✗ Fora do SLA (>60 min)';
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const ok    = counts[0] + counts[1] + counts[2];
+  const pctOk = tempos.length ? Math.round(ok / tempos.length * 100) : 0;
+  set('tempoValidoInfo',
+    tempos.length
+      ? `${tempos.length} registros com tempo calculado — <strong style="color:${pctOk>=80?'var(--success)':'var(--danger)'}">${pctOk}% dentro do SLA</strong>`
+      : 'Nenhum registro com tempo de resposta calculável nos filtros ativos'
+  );
+}
+
+/* ─────────────────────────────── RELATÓRIOS ────────────────────── */
+function buildRelatorios() {
+  const B=FILTERED, total=B.length;
+  if (!total) return;
+  const resol=B.filter(d=>d.resolvidoScada).length;
+  const indev=B.filter(d=>d.indevido).length;
+  const tempos=B.map(d=>d.tempoResposta).filter(v=>v!==null);
+  const tm=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):null;
+  const slaPct=tempos.length?Math.round(tempos.filter(t=>t<=60).length/tempos.length*100):null;
+  const datas=B.map(d=>parseDateBR(d[F.dataAcio])).filter(Boolean);
+  const periodo=datas.length?`${new Date(Math.min(...datas)).toLocaleDateString('pt-BR')} a ${new Date(Math.max(...datas)).toLocaleDateString('pt-BR')}`:'—';
+  const empresas=[...new Set(B.map(d=>d.EMPRESA))];
+  const sistemas=[...new Set(B.map(d=>d.Sistema).filter(s=>s&&s!=='Não informado'))];
+  const soloScada=B.filter(d=>d.resolvidoScada&&!d.outraEquipe).length;
+
+  document.getElementById('statRow').innerHTML=[
+    {v:total,       l:'Total de acionamentos',  sub:`Período: ${periodo}`, c:'var(--e-blue)'},
+    {v:`${Math.round(resol/total*100)}%`, l:'Taxa de resolução SCADA', sub:`${resol} de ${total} casos`, c:`${resol/total>=.85?'var(--success)':'var(--danger)'}`},
+    {v:tm?tm+' min':'N/D', l:'Tempo médio de resposta', sub:tm&&tm>60?'Acima do SLA (60 min)':'Dentro do SLA', c:`${!tm||tm<=60?'var(--success)':'var(--danger)'}`},
+    {v:slaPct!==null?slaPct+'%':'N/D', l:'Conformidade de SLA', sub:`Casos atendidos em ≤ 60 min`, c:`${slaPct===null||slaPct>=80?'var(--success)':slaPct>=60?'var(--warning)':'var(--danger)'}`},
+    {v:`${Math.round(indev/total*100)}%`, l:'Acionamentos indevidos', sub:`${indev} casos sem necessidade`, c:`${indev/total<=.15?'var(--success)':indev/total<=.25?'var(--warning)':'var(--danger)'}`},
+    {v:soloScada, l:'Somente SCADA', sub:`${total?Math.round(soloScada/total*100):0}% resolvido sem outra equipe`, c:'var(--e-blue)'},
+  ].map(s=>`<div class="stat-box"><div class="sb-val" style="color:${s.c}">${s.v}</div><div class="sb-label">${s.l}</div><div class="sb-sub">${s.sub}</div></div>`).join('');
+
+  const slaStatus=(val,ok,warn)=>val<=ok?'dot-ok':val<=warn?'dot-warn':'dot-bad';
+  document.getElementById('kpiTable').innerHTML = `
+    <thead><tr><th>Indicador</th><th>Valor</th><th>Meta</th><th>Status</th></tr></thead><tbody>
+    <tr><td>Taxa de resolução SCADA</td><td><strong>${Math.round(resol/total*100)}%</strong></td><td>≥ 85%</td>
+        <td><span class="status-dot ${resol/total>=.85?'dot-ok':'dot-bad'}"></span>${resol/total>=.85?'Meta atingida':'Abaixo da meta'}</td></tr>
+    <tr><td>Tempo médio de resposta</td><td><strong>${tm?tm+' min':'N/D'}</strong></td><td>≤ 60 min</td>
+        <td><span class="status-dot ${!tm||tm<=60?'dot-ok':tm<=90?'dot-warn':'dot-bad'}"></span>${!tm?'Sem dados':tm<=60?'Dentro do SLA':tm<=90?'Atenção':'SLA violado'}</td></tr>
+    <tr><td>Conformidade de SLA (≤ 60 min)</td><td><strong>${slaPct!==null?slaPct+'%':'N/D'}</strong></td><td>≥ 80%</td>
+        <td><span class="status-dot ${slaPct===null?'dot-warn':slaPct>=80?'dot-ok':slaPct>=60?'dot-warn':'dot-bad'}"></span>${slaPct===null?'Sem dados':slaPct>=80?'Meta atingida':slaPct>=60?'Atenção':'Crítico'}</td></tr>
+    <tr><td>Acionamentos indevidos</td><td><strong>${Math.round(indev/total*100)}%</strong></td><td>≤ 15%</td>
+        <td><span class="status-dot ${slaStatus(indev/total*100,15,25)}"></span>${indev/total<=.15?'Meta atingida':indev/total<=.25?'Atenção':'Crítico'}</td></tr>
+    <tr><td>Somente SCADA (sem outra equipe)</td><td><strong>${Math.round(soloScada/total*100)}%</strong></td><td>—</td>
+        <td><span class="status-dot dot-ok"></span>${soloScada} casos</td></tr>
+    </tbody>`;
+
+  const topEmp=Object.entries(B.reduce((acc,d)=>{acc[d.EMPRESA]=(acc[d.EMPRESA]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1])[0];
+  const topSis=Object.entries(B.filter(d=>d.Sistema&&d.Sistema!=='Não informado').reduce((acc,d)=>{acc[d.Sistema]=(acc[d.Sistema]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('relSummary').innerHTML =
+    `<i class="fas fa-file-alt"></i>
+     <div>No período analisado (<strong>${periodo}</strong>), foram registrados <strong>${total} acionamentos</strong>
+     em <strong>${empresas.length} empresas</strong> e <strong>${sistemas.length} sistemas</strong>.
+     Taxa de resolução: <strong style="color:${resol/total>=.85?'var(--success)':'var(--danger)'}">${Math.round(resol/total*100)}%</strong> (meta: 85%).
+     ${tm?`Tempo médio: <strong>${tm} min</strong> (SLA: 60 min). Conformidade SLA: <strong>${slaPct}%</strong>.`:''}
+     <strong style="color:${indev/total>.25?'var(--danger)':'var(--warning)'}">${Math.round(indev/total*100)}% (${indev} casos)</strong> foram
+     acionamentos indevidos (meta: ≤15%).
+     ${topEmp?`Empresa com maior demanda: <strong>${topEmp[0]}</strong> (${topEmp[1]} casos).`:''}
+     ${topSis?`Sistema mais acionado: <strong>${topSis[0]}</strong> (${topSis[1]} casos).`:''}</div>`;
+}
+
+/* ─────────────────────────────── TABLE ─────────────────────────── */
+function buildTable() {
+  const q = searchQ.toLowerCase().trim();
+  let rows = q ? FILTERED.filter(d=>
+    (d.Nome||'').toLowerCase().includes(q)||(d.EMPRESA||'').toLowerCase().includes(q)||
+    (d.Sistema||'').toLowerCase().includes(q)||(d.AreaSolic||'').toLowerCase().includes(q)||
+    (d[F.dataAcio]||'').includes(q)||(d.Id||'').toString().includes(q)
+  ) : FILTERED;
+
+  rows = [...rows].sort((a,b)=>{
+    let va=a[sortCol]??'', vb=b[sortCol]??'';
+    const n = typeof va==='number'||(!isNaN(+va)&&va!=='');
+    let cmp = n ? (+va)-(+vb) : String(va).localeCompare(String(vb),'pt-BR');
+    return sortDir==='asc'?cmp:-cmp;
+  });
+
+  const total=rows.length, pages=Math.ceil(total/PER_PAGE)||1;
+  page = Math.min(page, pages);
+  const start=(page-1)*PER_PAGE, slice=rows.slice(start, start+PER_PAGE);
+
+  set('tblCount', `${total} registro${total!==1?'s':''}`);
+  set('tblInfo',  total ? `Exibindo ${start+1}–${Math.min(start+slice.length,total)} de ${total}` : '');
+
+  document.getElementById('tblBody').innerHTML = slice.map(d=>{
+    const tempo = d.tempoResposta!=null
+      ? `<span style="color:${d.tempoResposta>60?'var(--danger)':d.tempoResposta>45?'var(--warning)':'var(--success)'};">${Math.round(d.tempoResposta)} min</span>`
+      : '<span style="color:var(--text-3);">N/D</span>';
+    const status = d.resolvidoScada
+      ? '<span class="badge badge-success">Resolvido</span>'
+      : d.outraEquipe
+        ? '<span class="badge badge-warning">Outra equipe</span>'
+        : '<span class="badge badge-neutral">Não resolvido</span>';
+    const nec = d.indevido
+      ? '<span class="badge badge-danger" title="Acionamento indevido"><i class="fas fa-exclamation-triangle"></i> Indevido</span>'
+      : '<span class="badge badge-success"><i class="fas fa-check"></i> Necessário</span>';
+    return `<tr>
+      <td style="font-family:'DM Mono';color:var(--text-3);">#${d.Id||'—'}</td>
+      <td>${d[F.dataAcio]||'—'}</td>
+      <td style="font-weight:500;">${escH(d.Nome||'—')}</td>
+      <td>${escH(d.EMPRESA||'—')}</td>
+      <td><span class="badge badge-info" style="font-size:10px;">${escH(d.Sistema||'—')}</span></td>
+      <td style="font-size:12px;color:var(--text-2);">${escH(d.AreaSolic||'—')}</td>
+      <td>${status}</td>
+      <td>${tempo}</td>
+      <td>${nec}</td>
+      <td><button class="icon-btn" onclick="openDetail('${escH(d.Id||'')}')" title="Ver detalhes" style="color:var(--e-blue);"><i class="fas fa-eye"></i></button></td>
+    </tr>`;
+  }).join('');
+
+  buildPager(pages);
+  updateSortArrows();
+}
+
+function buildPager(pages) {
+  const pg=document.getElementById('pager');
+  if (pages<=1){pg.innerHTML='';return;}
+  let html='';
+  html+=`<button class="pg-btn${page===1?' disabled':''}" data-p="${page-1}"><i class="fas fa-chevron-left" style="font-size:10px;"></i></button>`;
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-page)<=1) html+=`<button class="pg-btn${i===page?' active':''}" data-p="${i}">${i}</button>`;
+    else if(Math.abs(i-page)===2) html+=`<button class="pg-btn disabled" style="border:none;background:transparent;">…</button>`;
+  }
+  html+=`<button class="pg-btn${page===pages?' disabled':''}" data-p="${page+1}"><i class="fas fa-chevron-right" style="font-size:10px;"></i></button>`;
+  pg.innerHTML=html;
+  pg.querySelectorAll('.pg-btn:not(.disabled)').forEach(b=>b.addEventListener('click',()=>{page=+b.dataset.p;buildTable();}));
+}
+
+function updateSortArrows() {
+  ['Id','dataSort','Nome','EMPRESA','Sistema','tempoResposta'].forEach(col=>{
+    const el=document.getElementById(`sa-${col}`);
+    if(el){el.className='sort-arrow';if(col===sortCol)el.className=`sort-arrow ${sortDir}`;}
+  });
+}
+
+/* ─────────────────────────────── DETAIL MODAL ──────────────────── */
+function openDetail(id) {
+  const d = ALL.find(r=>r.Id===id);
+  if (!d) return;
+  const tempo = d.tempoResposta!=null?`${Math.round(d.tempoResposta)} min`:'Não disponível';
+  const sob   = d.duracaoSob!=null?`${d.duracaoSob.toFixed(2)} horas`:'Não disponível';
+  document.getElementById('detailTitle').textContent = `Acionamento #${id} — ${d[F.dataAcio]||''}`;
+  const pairs=[
+    ['Colaborador', d.Nome],['E-mail', d[F.email]],
+    ['Empresa', d.EMPRESA],['Sistema', d.Sistema],
+    ['Área Solicitante', d.AreaSolic],['Solicitante', d[F.nomeSolic]],
+    ['Início atendimento', `${d[F.dataAcio]||''} ${d[F.hrAtenIni]||''}`],
+    ['Fim atendimento', `${d[F.dataFinal]||''} ${d[F.hrFinal]||''}`],
+    ['Tempo de resposta', tempo],['Duração sobreaviso', sob],
+    ['Intervenção SCADA?', d.intervencao?'Sim':'Não'],
+    ['Resolvido SCADA?', d.resolvidoScada?'Sim':'Não'],
+    ['Outra equipe?', d.outraEquipe?(d[F.qualEq]||'Sim'):'Não'],
+    ['Necessário acionar?', d.indevido?'Não — Indevido':'Sim'],
+  ];
+  const pairsHTML = pairs.map(([k,val])=>
+    `<div class="detail-pair"><span class="dp-key">${k}</span><span class="dp-val">${escH(String(val||'—'))}</span></div>`
+  ).join('');
+  const blocks = [
+    [F.ocorren, 'Dados da Ocorrência'],
+    [F.registro,'Registro do Atendimento'],
+    [F.obs,     'Observações'],
+  ].filter(([field])=>d[field]&&d[field].trim()&&d[field].trim()!=='NA')
+   .map(([field,lbl])=>`<div class="detail-block"><div class="db-label">${lbl}</div><div class="db-text">${escH(d[field])}</div></div>`)
+   .join('');
+  document.getElementById('detailBody').innerHTML = pairsHTML + blocks;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+/* ─────────────────────────────── CHART EXPAND MODAL ────────────── */
+function openChartModal(cid) {
+  const src = CHARTS[cid];
+  if (!src) return;
+  const card = document.querySelector(`[data-cid="${cid}"]`)?.closest('.card');
+  document.getElementById('chartModalTitle').textContent = card?.querySelector('h2')?.textContent?.trim()||'Gráfico';
+  destroyChart('cModal');
+  CHARTS.cModal = new Chart(g('cModal'),{
+    type: src.config.type,
+    data: JSON.parse(JSON.stringify(src.data)),
+    options: {...src.options, responsive:true, maintainAspectRatio:false}
+  });
+  document.getElementById('chartModal').classList.add('open');
+}
+
+/* ─────────────────────────────── EXPORT ────────────────────────── */
+function exportCSV() {
+  const B=FILTERED;
+  if(!B.length){showMsg('Sem dados para exportar.','warn');return;}
+  const hdr=['Id','Data Acionamento','Colaborador','Email','Empresa','Sistema','Área Solicitante','Nome Solicitante',
+             'Status','Tempo Resposta (min)','Duração Sobreaviso (h)','Indevido','Intervenção SCADA','Resolvido SCADA','Outra Equipe','Qual Equipe'];
+  const rows=B.map(d=>[
+    d.Id||'',
+    d[F.dataAcio]||'',
+    d.Nome||'',
+    d[F.email]||'',
+    d.EMPRESA||'',
+    d.Sistema||'',
+    d.AreaSolic||'',
+    d[F.nomeSolic]||'',
+    d.Status||'',
+    d.tempoResposta!=null?Math.round(d.tempoResposta):'',
+    d.duracaoSob!=null?d.duracaoSob.toFixed(2):'',
+    d.indevido?'SIM':'NÃO',
+    d.intervencao?'SIM':'NÃO',
+    d.resolvidoScada?'SIM':'NÃO',
+    d.outraEquipe?'SIM':'NÃO',
+    d[F.qualEq]||'',
+  ].map(v=>String(v).includes(';')?`"${v}"`:v).join(';'));
+  const bom='\uFEFF';
+  const blob=new Blob([bom+[hdr.join(';'),...rows].join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`acionamentos_scada_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+}
+
+function showPdfPreview() {
+  if(!ALL.length){showMsg('Carregue dados antes de exportar.','warn');return;}
+  const B=FILTERED,total=B.length;
+  if(!total)return;
+  const resol=B.filter(d=>d.resolvidoScada).length;
+  const indev=B.filter(d=>d.indevido).length;
+  const tempos=B.map(d=>d.tempoResposta).filter(v=>v!=null);
+  const tm=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):null;
+  const slaPct=tempos.length?Math.round(tempos.filter(t=>t<=60).length/tempos.length*100):null;
+  const soloScada=B.filter(d=>d.resolvidoScada&&!d.outraEquipe).length;
+  const datas=B.map(d=>parseDateBR(d[F.dataAcio])).filter(Boolean);
+  const periodo=datas.length?`${new Date(Math.min(...datas)).toLocaleDateString('pt-BR')} a ${new Date(Math.max(...datas)).toLocaleDateString('pt-BR')}`:'—';
+  const empresas=[...new Set(B.map(d=>d.EMPRESA))];
+  const sistemas=[...new Set(B.map(d=>d.Sistema).filter(s=>s&&s!=='Não informado'))];
+  const topEmp=Object.entries(B.reduce((acc,d)=>{acc[d.EMPRESA]=(acc[d.EMPRESA]||0)+1;return acc;},{})).sort((a,b)=>b[1]-a[1])[0];
+  const colabs=[...new Set(B.map(d=>d.Nome).filter(n=>n&&n!=='Não informado'))];
+
+  /* Área breakdown for PDF */
+  const areaMap={};
+  B.forEach(d=>{const a=d.AreaSolic;if(a&&a!=='Não informado')areaMap[a]=(areaMap[a]||0)+1;});
+  const topAreas=Object.entries(areaMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  /* Sistema breakdown */
+  const sisMap={};
+  B.forEach(d=>{const s=d.Sistema||'N/I';if(!sisMap[s])sisMap[s]={t:0,r:0,i:0};sisMap[s].t++;if(d.resolvidoScada)sisMap[s].r++;if(d.indevido)sisMap[s].i++;});
+
+  document.getElementById('pdfPreview').innerHTML=`
+    <div style="border-bottom:3px solid #1a75bc;padding-bottom:10px;margin-bottom:16px;">
+      <h2 style="font-size:18px;font-weight:700;color:#1a365d;">Relatório de Acionamentos SCADA/ADMS — Energisa</h2>
+      <p style="font-size:12px;color:#64748b;">Emitido em ${new Date().toLocaleDateString('pt-BR')} · Período: ${periodo} · ${total} registros · ${empresas.length} empresas · ${sistemas.length} sistemas · ${colabs.length} colaboradores</p>
+    </div>
+
+    <div style="background:#f0f9ff;border-left:4px solid #1a75bc;padding:12px 16px;border-radius:6px;margin-bottom:16px;font-size:13px;color:#0f172a;">
+      <strong>Resumo Executivo:</strong> No período foram registrados <strong>${total} acionamentos</strong> com taxa de resolução SCADA de
+      <strong>${Math.round(resol/total*100)}%</strong> (meta: 85%).
+      ${tm?`Tempo médio de resposta: <strong>${tm} min</strong> (SLA: 60 min). Conformidade de SLA: <strong>${slaPct}%</strong>.`:''} 
+      <strong>${Math.round(indev/total*100)}% (${indev} casos)</strong> foram classificados como acionamentos indevidos, representando
+      custo evitável de sobreaviso. ${topEmp?`Empresa com maior demanda: <strong>${topEmp[0]}</strong> (${topEmp[1]} casos).`:''}
+    </div>
+
+    <h3 style="font-size:14px;font-weight:700;color:#1a365d;margin:12px 0 8px;">Indicadores-Chave de Desempenho</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px;">
+      <thead><tr style="background:#f1f5f9;">
+        <th style="padding:7px 10px;text-align:left;border-bottom:1px solid #e2e8f0;">Indicador</th>
+        <th style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Valor</th>
+        <th style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Meta</th>
+        <th style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Status</th>
+      </tr></thead>
+      <tbody>
+        ${[
+          ['Resolução SCADA', `${Math.round(resol/total*100)}%`, '≥ 85%', resol/total>=.85, resol/total>=.85?'✓ Atingida':'✗ Abaixo'],
+          ['Tempo médio resposta', tm?tm+' min':'N/D', '≤ 60 min', !tm||tm<=60, !tm?'—':tm<=60?'✓ OK':'✗ Violado'],
+          ['Conformidade SLA', slaPct!==null?slaPct+'%':'N/D', '≥ 80%', slaPct===null||slaPct>=80, slaPct===null?'—':slaPct>=80?'✓ OK':slaPct>=60?'⚠ Atenção':'✗ Crítico'],
+          ['Acionamentos indevidos', `${Math.round(indev/total*100)}%`, '≤ 15%', indev/total<=.15, indev/total<=.15?'✓ OK':indev/total<=.25?'⚠ Atenção':'✗ Crítico'],
+          ['Somente SCADA', `${Math.round(soloScada/total*100)}%`, '—', true, `${soloScada} casos`],
+        ].map(([lbl,val,meta,ok,status])=>`
+          <tr style="border-bottom:1px solid #e2e8f0;">
+            <td style="padding:7px 10px;">${lbl}</td>
+            <td style="text-align:center;font-weight:700;">${val}</td>
+            <td style="text-align:center;color:#64748b;">${meta}</td>
+            <td style="text-align:center;color:${ok?'#059669':'#dc2626'}">${status}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+      <div>
+        <h3 style="font-size:13px;font-weight:700;color:#1a365d;margin-bottom:8px;">Desempenho por Sistema</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="background:#f1f5f9;"><th style="padding:5px 8px;text-align:left;border-bottom:1px solid #e2e8f0;">Sistema</th><th style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">Total</th><th style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">Resolução</th><th style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">Indevidos</th></tr></thead>
+          <tbody>${Object.entries(sisMap).sort((a,b)=>b[1].t-a[1].t).map(([s,v])=>`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;">${s}</td><td style="text-align:center;">${v.t}</td><td style="text-align:center;color:#059669;">${Math.round(v.r/v.t*100)}%</td><td style="text-align:center;color:#dc2626;">${Math.round(v.i/v.t*100)}%</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+      <div>
+        <h3 style="font-size:13px;font-weight:700;color:#1a365d;margin-bottom:8px;">Top Áreas Solicitantes</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="background:#f1f5f9;"><th style="padding:5px 8px;text-align:left;border-bottom:1px solid #e2e8f0;">Área</th><th style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">Acionamentos</th><th style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">% do Total</th></tr></thead>
+          <tbody>${topAreas.map(([a,n])=>`<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;">${a}</td><td style="text-align:center;">${n}</td><td style="text-align:center;">${Math.round(n/total*100)}%</td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:600;color:#1a365d;margin-bottom:10px;">Recomendações Prioritárias</h3>
+    <ul style="font-size:13px;color:#475569;line-height:1.9;padding-left:18px;">
+      ${indev/total>.15?`<li>Implementar protocolo de triagem para reduzir ${Math.round(indev/total*100)}% de acionamentos indevidos — capacitação das áreas solicitantes prioritárias.</li>`:''}
+      ${tm&&tm>60?`<li>Revisar processo de atendimento: tempo médio de ${tm} min excede SLA em ${tm-60} min. Analisar gargalos por colaborador e horário.</li>`:''}
+      ${slaPct!==null&&slaPct<80?`<li>Conformidade de SLA de ${slaPct}% está abaixo da meta de 80%. Rever dimensionamento da equipe de sobreaviso, especialmente nos horários de pico.</li>`:''}
+      ${resol/total<.85?`<li>Capacitar equipe para elevar taxa de resolução de ${Math.round(resol/total*100)}% para meta de 85%.</li>`:''}
+      <li>Revisar escala de sobreaviso com base no mapa de pico horário — concentração noturna requer atenção especial.</li>
+      <li>Acompanhar mensalmente os indicadores de SLA, resolução e indevidos para identificar tendências regressivas.</li>
+    </ul>
+
+    <div style="margin-top:14px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b;">
+      <strong>Notas de qualidade dos dados:</strong> ${DATA_QUALITY.withTime} de ${DATA_QUALITY.total} registros possuem tempo de resposta calculável (${Math.round(DATA_QUALITY.withTime/DATA_QUALITY.total*100)}%). 
+      ${DATA_QUALITY.errorTime>0?`${DATA_QUALITY.errorTime} registros com inconsistência de data foram descartados do cálculo de tempo.`:''} 
+      Registros sem hora de início ou fim são excluídos dos indicadores de tempo.
+    </div>`;
+  document.getElementById('pdfModal').classList.add('open');
+}
+
+async function generatePDF() {
+  const {jsPDF}=window.jspdf;
+  const B=FILTERED,total=B.length;
+  if(!total)return;
+  const resol=B.filter(d=>d.resolvidoScada).length;
+  const indev=B.filter(d=>d.indevido).length;
+  const tempos=B.map(d=>d.tempoResposta).filter(v=>v!=null);
+  const tm=tempos.length?Math.round(tempos.reduce((a,b)=>a+b,0)/tempos.length):null;
+  const slaPct=tempos.length?Math.round(tempos.filter(t=>t<=60).length/tempos.length*100):null;
+  const soloScada=B.filter(d=>d.resolvidoScada&&!d.outraEquipe).length;
+  const datas=B.map(d=>parseDateBR(d[F.dataAcio])).filter(Boolean);
+  const periodo=datas.length?`${new Date(Math.min(...datas)).toLocaleDateString('pt-BR')} a ${new Date(Math.max(...datas)).toLocaleDateString('pt-BR')}`:'—';
+
+  doc=new jsPDF('p','mm','a4');
+  doc.setFontSize(17);doc.setTextColor(26,54,93);doc.text('Relatório de Acionamentos SCADA/ADMS — Energisa',20,20);
+  doc.setFontSize(10);doc.setTextColor(100,116,139);
+  doc.text(`Emitido em ${new Date().toLocaleDateString('pt-BR')}  |  Período: ${periodo}  |  ${total} registros`,20,30);
+  doc.setFontSize(12);doc.setTextColor(26,54,93);doc.text('Indicadores-Chave de Desempenho',20,45);
+  doc.setFontSize(10);doc.setTextColor(51,51,51);
+  [
+    `• Resolução SCADA: ${Math.round(resol/total*100)}% (meta: ≥85%)`,
+    `• Tempo médio de resposta: ${tm?tm+' min':'N/D'} (SLA: ≤60 min)`,
+    `• Conformidade de SLA: ${slaPct!==null?slaPct+'%':'N/D'} (meta: ≥80%)`,
+    `• Acionamentos indevidos: ${Math.round(indev/total*100)}% (meta: ≤15%)`,
+    `• Somente SCADA (sem outra equipe): ${Math.round(soloScada/total*100)}% — ${soloScada} casos`,
+  ].forEach((l,i)=>doc.text(l,20,55+i*7));
+  const chartDefs=[
+    {id:'cEmpresa',title:'Acionamentos por Empresa'},
+    {id:'cSistema', title:'Desempenho por Sistema'},
+    {id:'cHoras',  title:'Horas de Sobreaviso vs Indevidas'},
+    {id:'cTempo',  title:'Volume ao Longo do Tempo'},
+  ];
+  for(const cd of chartDefs){
+    const canvas=document.getElementById(cd.id);
+    if(!canvas||!CHARTS[cd.id])continue;
+    try{
+      const img=canvas.toDataURL('image/png');
+      doc.addPage();doc.setFontSize(13);doc.setTextColor(26,54,93);doc.text(cd.title,20,20);
+      doc.addImage(img,'PNG',15,28,180,85);
+    }catch(e){console.warn(e);}
+  }
+  doc.save(`acionamentos_scada_${new Date().toISOString().slice(0,10)}.pdf`);
+  document.getElementById('pdfModal').classList.remove('open');
+}
+
+/* ─────────────────────────────── FILE LOAD ─────────────────────── */
+/*
+  ENCODING FIX:
+  The CSV exported from the Microsoft Forms/Excel is encoded in cp1252
+  (Windows Western European). The column "Sistema\xa0" contains a
+  non-breaking space (byte 0xA0). When the browser reads this as UTF-8,
+  byte 0xA0 is an invalid lone continuation byte → replaced with U+FFFD
+  (replacement char "�"). The nk() normalizer only strips U+00A0, so
+  "Sistema\ufffd" never matches F.sistema = "Sistema".
+
+  The same corruption affects EVERY field name with accented chars:
+    "Hora de início"     → "Hora de in\ufffdc̃io"
+    "Área solicitante"   → "\ufffdrea solicitante"
+    ...
+  This explains: 0% quality, blank Pareto, empty time-distribution chart.
+
+  Fix strategy: attempt UTF-8 first (handles UTF-8 with BOM). If the
+  parsed header contains U+FFFD, re-read the raw bytes as ISO-8859-1
+  (Latin-1), which correctly maps 0xA0 → U+00A0 and all Portuguese
+  accented bytes (0xC0-0xFF) to their Unicode equivalents. The cp1252
+  range 0x80-0x9F is identical to Latin-1 for the chars actually used
+  in this dataset (smart quotes, em-dash etc. in free-text fields only).
+*/
+function loadCSV(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+    showMsg('Selecione um arquivo .csv', 'warn'); return;
+  }
+  g('loadingWrap').style.display = 'block';
+
+  /* ── inner parse function — called once encoding is resolved ── */
+  function parse(txt) {
+    const delim = txt.split('\n')[0].includes(';') ? ';' : ',';
+    const res = Papa.parse(txt, {
+      header: true, delimiter: delim,
+      skipEmptyLines: true,
+      transform: v => v ? v.toString().trim() : '',
+    });
+    if (res.errors.length && res.errors[0].type !== 'Delimiter')
+      throw new Error(res.errors[0].message);
+    const raw = res.data.filter(r => Object.values(r).some(v => v && v.trim() !== ''));
+    if (!raw.length) throw new Error('Nenhum dado válido encontrado');
+    return raw;
+  }
+
+  /* ── check if UTF-8 decode produced replacement chars in header ── */
+  function hasEncodingCorruption(txt) {
+    const header = txt.split('\n')[0];
+    return header.includes('\uFFFD');   /* U+FFFD = UTF-8 decode failure */
+  }
+
+  /* ── success handler ── */
+  function onParsed(raw, detectedEncoding) {
+    try {
+      ALL = raw.map(processRow);
+      FILTERED = [...ALL];
+      computeDataQuality(ALL);
+      initFilters();
+      applyFilters();
+
+      g('uploadZone').style.display = 'none';
+      g('dashBody').style.display   = 'block';
+      const pill = g('dataPill');
+      pill.style.display = 'inline-flex';
+      pill.textContent   = `${ALL.length} registros`;
+
+      const datas = ALL.map(d => parseDateBR(d[F.dataAcio])).filter(Boolean);
+      const per   = datas.length
+        ? `${new Date(Math.min(...datas)).toLocaleDateString('pt-BR')} a ${new Date(Math.max(...datas)).toLocaleDateString('pt-BR')}`
+        : '—';
+      const emp = [...new Set(ALL.map(d => d.EMPRESA))];
+      const sis = [...new Set(ALL.map(d => d.Sistema).filter(s => s && s !== 'Não informado'))];
+      g('dataNoticeText').innerHTML =
+        `<strong>${ALL.length} registros importados</strong> · ${emp.length} empresas · ${sis.length} sistemas · Período: ${per}`
+        + ` · <span style="color:${DATA_QUALITY.withTime / ALL.length < .8 ? 'var(--warning)' : 'inherit'};">${DATA_QUALITY.withTime} com tempo calculado</span>`
+        + (DATA_QUALITY.errorTime > 0 ? ` · <span style="color:var(--warning);">${DATA_QUALITY.errorTime} com datas inconsistentes (excluídos)</span>` : '')
+        + ` · <span style="color:var(--text-3);font-size:11px;">encoding: ${detectedEncoding}</span>`;
+
+      showMsg(`${ALL.length} registros processados com sucesso.`, 'success');
+    } catch (err) {
+      showMsg(`Erro ao processar o arquivo: ${err.message}`, 'error');
+      console.error(err);
+    } finally {
+      g('loadingWrap').style.display = 'none';
+    }
+  }
+
+  /* ── Step 1: try UTF-8 ── */
+  const r1 = new FileReader();
+  r1.onerror = () => { showMsg('Erro ao ler o arquivo.', 'error'); g('loadingWrap').style.display = 'none'; };
+  r1.onload  = e1 => {
+    const txtUTF8 = e1.target.result;
+
+    if (!hasEncodingCorruption(txtUTF8)) {
+      /* UTF-8 is clean — proceed normally */
+      try { onParsed(parse(txtUTF8), 'UTF-8'); }
+      catch (err) { showMsg(`Erro: ${err.message}`, 'error'); g('loadingWrap').style.display = 'none'; }
+      return;
+    }
+
+    /* ── Step 2: UTF-8 had replacement chars → re-read as ISO-8859-1 ── */
+    const r2 = new FileReader();
+    r2.onerror = () => { showMsg('Erro ao ler o arquivo.', 'error'); g('loadingWrap').style.display = 'none'; };
+    r2.onload  = e2 => {
+      try { onParsed(parse(e2.target.result), 'ISO-8859-1 (cp1252)'); }
+      catch (err) { showMsg(`Erro: ${err.message}`, 'error'); g('loadingWrap').style.display = 'none'; }
+    };
+    r2.readAsText(file, 'ISO-8859-1');
+  };
+  r1.readAsText(file, 'UTF-8');
+}
+
+function showMsg(msg,type) {
+  const d=document.getElementById('uploadMsg');
+  const cls={success:'notice-success',warn:'notice-warning',error:'notice-danger'}[type]||'notice-info';
+  const ic ={success:'check-circle',warn:'exclamation-triangle',error:'times-circle'}[type]||'info-circle';
+  d.innerHTML=`<div class="notice ${cls}" style="margin-top:0;"><i class="fas fa-${ic}"></i>${msg}</div>`;
+  if(type==='success')setTimeout(()=>d.innerHTML='',5000);
+}
+
+/* ─────────────────────────────── RESET / REIMPORT ──────────────── */
+/*
+  resetAll() performs a complete teardown of all loaded data, charts
+  and UI state, returning the dashboard to its initial "upload" state.
+  This allows the user to load a different CSV without a page reload.
+
+  Steps:
+    1. Clear global data arrays and state flags
+    2. Destroy every Chart.js instance to free canvas/memory
+    3. Reset TABS_BUILT so lazy tabs re-initialize on next visit
+    4. Reset all KPI placeholders to "—"
+    5. Hide dashBody, re-show uploadZone and all "no data" notices
+    6. Clear the file input value so the same file can be re-selected
+*/
+function resetAll() {
+  /* 1. Data state */
+  ALL = []; FILTERED = []; DATA_QUALITY = {};
+  sortCol = 'dataSort'; sortDir = 'desc'; searchQ = ''; page = 1;
+
+  /* 2. Destroy every chart */
+  Object.keys(CHARTS).forEach(id => destroyChart(id));
+
+  /* 3. Tab flags — must reset so lazy tabs rebuild on next visit */
+  TABS_BUILT = {};
+
+  /* 4. KPI reset */
+  ['kTotal','kResol','kTempo','kIndev','kSolo','kSLA'].forEach(id => set(id, '—'));
+  set('kTempoMeta', ''); set('kTotalSub', 'Período selecionado');
+  set('kSoloPct', '—'); set('kSLAsub', 'Meta: ≥ 80% dos casos');
+  set('trendTotal',''); set('trendResol',''); set('trendIndev','');
+
+  /* 5. UI state */
+  g('dashBody').style.display    = 'none';
+  g('uploadZone').style.display  = '';        /* restore upload card */
+  g('dataPill').style.display    = 'none';
+  g('uploadMsg').innerHTML       = '';
+  g('tblBody').innerHTML         = '';
+  g('insightContainer').innerHTML= '';
+  g('dqPanel').innerHTML         = '';
+  g('dqAlerts').innerHTML        = '';
+  g('dataNoticeText').innerHTML  = '';
+
+  /* Reset other tabs to "no data" state */
+  g('perfBody').style.display    = 'none';
+  g('perfNoData').style.display  = '';
+  g('tendBody').style.display    = 'none';
+  g('tendNoData').style.display  = '';
+  g('relBody').style.display     = 'none';
+  g('relNoData').style.display   = '';
+  g('rankingList').innerHTML     = '';
+  g('peakInfo').innerHTML        = '';
+  set('tempoValidoInfo', '');
+
+  /* Navigate back to dashboard tab */
+  document.querySelectorAll('.nav-link[data-tab]').forEach(l => l.classList.remove('active'));
+  document.querySelector('.nav-link[data-tab="dashboard"]')?.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  g('dashboard')?.classList.add('active');
+  set('pageTitle', 'Dashboard de Acionamentos');
+  set('pageSubtitle', 'Análise operacional do time SCADA/ADMS');
+
+  /* 6. Clear file input so same file can be selected again */
+  g('csvInput').value = '';
+}
+
+/* ─────────────────────────────── EXPORT PNG ────────────────────── */
+/*
+  Strategy: html2canvas cannot reliably resolve CSS custom properties
+  (CSS vars) or external Google Fonts when the element is off-screen.
+  Solution: build a self-contained snapshot <div> using only hard-coded
+  inline styles. This guarantees pixel-perfect rendering independent of
+  the active theme/viewport, and produces a white-background image that
+  prints well.
+
+  Layout sections rendered (top → bottom):
+    1. Header band  — logo bolt, title, subtitle, date/period badge
+    2. Stat grid    — 6 metric tiles (3 × 2), mirrors the Resumo Executivo
+    3. Divider
+    4. KPI table    — Status dos Indicadores with colored status dots
+    5. Summary      — Resumo analítico paragraph
+
+  The root node is 820 px wide (fixed), so responsive breakpoints never
+  apply. Scale factor 2× gives ~1640 px raster width → crisp on Retina.
+*/
+async function exportPNG() {
+  if (!ALL.length) { showMsg('Carregue dados antes de exportar.', 'warn'); return; }
+  if (!FILTERED.length) { showMsg('Nenhum registro nos filtros ativos.', 'warn'); return; }
+
+  /* ── Show spinner ── */
+  g('pngSpinnerOverlay').classList.add('open');
+
+  /* Small rAF to guarantee the spinner paints before heavy work */
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  try {
+    const B     = FILTERED;
+    const total = B.length;
+    const resol = B.filter(d => d.resolvidoScada).length;
+    const indev = B.filter(d => d.indevido).length;
+    const tempos = B.map(d => d.tempoResposta).filter(v => v !== null);
+    const tm     = tempos.length ? Math.round(tempos.reduce((a, b) => a + b, 0) / tempos.length) : null;
+    const slaPct = tempos.length ? Math.round(tempos.filter(t => t <= 60).length / tempos.length * 100) : null;
+    const soloScada = B.filter(d => d.resolvidoScada && !d.outraEquipe).length;
+    const datas  = B.map(d => parseDateBR(d[F.dataAcio])).filter(Boolean);
+    const periodo = datas.length
+      ? `${new Date(Math.min(...datas)).toLocaleDateString('pt-BR')} a ${new Date(Math.max(...datas)).toLocaleDateString('pt-BR')}`
+      : '—';
+    const empresas = [...new Set(B.map(d => d.EMPRESA))];
+    const sistemas = [...new Set(B.map(d => d.Sistema).filter(s => s && s !== 'Não informado'))];
+    const topEmp   = Object.entries(B.reduce((acc, d) => { acc[d.EMPRESA] = (acc[d.EMPRESA] || 0) + 1; return acc; }, {}))
+                     .sort((a, b) => b[1] - a[1])[0];
+
+    /* ── colour helpers (hard-coded, no CSS vars) ── */
+    const C = {
+      blue:    '#1a75bc', blueSoft: '#e8f2fb', blueDark: '#135a96',
+      green:   '#059669', greenBg:  '#ecfdf5',
+      red:     '#dc2626', redBg:    '#fef2f2',
+      amber:   '#d97706', amberBg:  '#fffbeb',
+      gray:    '#94a3b8', grayBg:   '#f8fafc',
+      border:  '#e2e8f0', border2:  '#cbd5e1',
+      text1:   '#0f172a', text2:    '#475569', text3:    '#94a3b8',
+      surface: '#ffffff',
+    };
+
+    const metricOk  = (ok) => ok ? C.green  : C.red;
+    const metricBg  = (ok) => ok ? C.greenBg: C.redBg;
+
+    /* ── 6 stat tiles ── */
+    const resolOk   = resol / total >= .85;
+    const tmOk      = !tm || tm <= 60;
+    const slaOk     = slaPct === null || slaPct >= 80;
+    const indevOk   = indev / total <= .15;
+
+    const tiles = [
+      { val: total,                                 label: 'Total de acionamentos',   sub: `Período: ${periodo}`,                    color: C.blue },
+      { val: Math.round(resol / total * 100) + '%', label: 'Resolução SCADA',          sub: `${resol} de ${total} casos · meta ≥85%`, color: metricOk(resolOk) },
+      { val: tm ? tm + ' min' : 'N/D',              label: 'Tempo médio de resposta',  sub: tm && !tmOk ? 'Acima do SLA (60 min)' : 'Dentro do SLA · meta ≤60 min', color: metricOk(tmOk) },
+      { val: slaPct !== null ? slaPct + '%' : 'N/D',label: 'Conformidade de SLA',      sub: 'Casos atendidos em ≤60 min · meta ≥80%', color: metricOk(slaOk) },
+      { val: Math.round(indev / total * 100) + '%', label: 'Acionamentos indevidos',   sub: `${indev} casos sem necessidade · meta ≤15%`, color: metricOk(indevOk) },
+      { val: soloScada,                             label: 'Somente SCADA',            sub: `${Math.round(soloScada / total * 100)}% resolvido sem outra equipe`, color: C.blue },
+    ];
+
+    const tileHTML = tiles.map(t => `
+      <div style="background:${C.grayBg};border:1px solid ${C.border};border-radius:10px;
+                  padding:16px;box-sizing:border-box;">
+        <div style="font-family:'DM Mono',monospace;font-size:26px;font-weight:500;
+                    color:${t.color};margin-bottom:4px;line-height:1;">${t.val}</div>
+        <div style="font-size:12px;color:${C.text2};font-weight:600;margin-bottom:3px;">${t.label}</div>
+        <div style="font-size:11px;color:${C.text3};">${t.sub}</div>
+      </div>`).join('');
+
+    /* ── KPI table rows ── */
+    const dotStyle = (c) =>
+      `display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:6px;vertical-align:middle;`;
+
+    const kpiRows = [
+      { label: 'Resolução SCADA',         val: Math.round(resol / total * 100) + '%', meta: '≥ 85%', ok: resolOk,  status: resolOk ? 'Meta atingida' : 'Abaixo da meta' },
+      { label: 'Tempo médio de resposta',  val: tm ? tm + ' min' : 'N/D',             meta: '≤ 60 min', ok: tmOk,   status: !tm ? 'Sem dados' : tmOk ? 'Dentro do SLA' : 'SLA violado' },
+      { label: 'Conformidade SLA (≤60 min)',val: slaPct !== null ? slaPct + '%' : 'N/D', meta: '≥ 80%', ok: slaOk, status: slaPct === null ? 'Sem dados' : slaOk ? 'Meta atingida' : slaPct >= 60 ? 'Atenção' : 'Crítico' },
+      { label: 'Acionamentos indevidos',   val: Math.round(indev / total * 100) + '%',meta: '≤ 15%', ok: indevOk, status: indevOk ? 'Meta atingida' : indev / total <= .25 ? 'Atenção' : 'Crítico' },
+      { label: 'Somente SCADA',            val: Math.round(soloScada / total * 100) + '%', meta: '—', ok: true, status: `${soloScada} casos` },
+    ].map((r, i) => `
+      <tr style="background:${i % 2 === 0 ? C.surface : C.grayBg};">
+        <td style="padding:10px 14px;border-bottom:1px solid ${C.border};color:${C.text1};font-size:13px;">${r.label}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid ${C.border};text-align:center;font-weight:700;font-size:13px;color:${metricOk(r.ok)};">${r.val}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid ${C.border};text-align:center;color:${C.text3};font-size:12px;">${r.meta}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid ${C.border};font-size:12px;">
+          <span style="${dotStyle(r.ok ? C.green : (r.status === 'Atenção' ? C.amber : C.red))}"></span>
+          <span style="color:${r.ok ? C.green : (r.status === 'Atenção' ? C.amber : C.red)};font-weight:600;">${r.status}</span>
+        </td>
+      </tr>`).join('');
+
+    /* ── Summary text ── */
+    const summaryText =
+      `No período analisado (${periodo}), foram registrados ${total} acionamentos em ${empresas.length} empresa(s) `
+      + `e ${sistemas.length} sistema(s). Taxa de resolução: ${Math.round(resol / total * 100)}% (meta: 85%). `
+      + (tm ? `Tempo médio de resposta: ${tm} min (SLA: 60 min). Conformidade de SLA: ${slaPct !== null ? slaPct + '%' : 'N/D'}. ` : '')
+      + `${Math.round(indev / total * 100)}% (${indev} casos) foram acionamentos indevidos (meta: ≤15%). `
+      + (topEmp ? `Empresa com maior demanda: ${topEmp[0]} (${topEmp[1]} casos).` : '');
+
+    /* ── Today's date for filename and header ── */
+    const now   = new Date();
+    const dd    = String(now.getDate()).padStart(2, '0');
+    const mm    = String(now.getMonth() + 1).padStart(2, '0');
+    const yy    = String(now.getFullYear()).slice(-2);
+    const dateLabel = now.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+    const filename  = `Relatorio_Executivo_${dd}${mm}${yy}.png`;
+
+    /* ── Compose snapshot HTML (820 px, white bg, inline-only styles) ── */
+    const html = `
+      <div style="background:#fff;padding:36px 36px 28px;box-sizing:border-box;width:820px;">
+
+        <!-- HEADER -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:24px;
+                    padding-bottom:20px;border-bottom:2px solid ${C.blue};">
+          <div style="width:44px;height:44px;background:${C.blue};border-radius:8px;
+                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="#fff"/>
+            </svg>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:18px;font-weight:700;color:${C.blueDark};line-height:1.2;">
+              Relatório de Acionamentos SCADA/ADMS — Energisa
+            </div>
+            <div style="font-size:12px;color:${C.text3};margin-top:3px;">
+              Emitido em ${dateLabel}
+            </div>
+          </div>
+          <div style="background:${C.blueSoft};color:${C.blue};border-radius:6px;
+                      padding:6px 14px;font-size:12px;font-weight:600;white-space:nowrap;">
+            ${total} registros
+          </div>
+        </div>
+
+        <!-- PERIOD BADGE -->
+        <div style="font-size:12px;color:${C.text3};margin-bottom:16px;font-weight:500;">
+          📅 Período analisado: <strong style="color:${C.text1};">${periodo}</strong>
+          &nbsp;·&nbsp; ${empresas.length} empresa(s)
+          &nbsp;·&nbsp; ${sistemas.length} sistema(s)
+        </div>
+
+        <!-- STAT TILES -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;">
+          ${tileHTML}
+        </div>
+
+        <!-- KPI TABLE -->
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+                    color:${C.text3};margin-bottom:8px;">Status dos Indicadores</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;
+                      border:1px solid ${C.border};border-radius:8px;overflow:hidden;margin-bottom:20px;">
+          <thead>
+            <tr style="background:${C.grayBg};">
+              <th style="padding:9px 14px;text-align:left;font-size:11px;font-weight:700;
+                         text-transform:uppercase;letter-spacing:.05em;color:${C.text2};
+                         border-bottom:1px solid ${C.border2};">Indicador</th>
+              <th style="padding:9px 14px;text-align:center;font-size:11px;font-weight:700;
+                         text-transform:uppercase;letter-spacing:.05em;color:${C.text2};
+                         border-bottom:1px solid ${C.border2};">Valor</th>
+              <th style="padding:9px 14px;text-align:center;font-size:11px;font-weight:700;
+                         text-transform:uppercase;letter-spacing:.05em;color:${C.text2};
+                         border-bottom:1px solid ${C.border2};">Meta</th>
+              <th style="padding:9px 14px;font-size:11px;font-weight:700;
+                         text-transform:uppercase;letter-spacing:.05em;color:${C.text2};
+                         border-bottom:1px solid ${C.border2};">Status</th>
+            </tr>
+          </thead>
+          <tbody>${kpiRows}</tbody>
+        </table>
+
+        <!-- SUMMARY -->
+        <div style="background:${C.blueSoft};border-left:4px solid ${C.blue};
+                    border-radius:0 8px 8px 0;padding:14px 18px;
+                    font-size:12.5px;color:${C.text2};line-height:1.75;">
+          <div style="font-weight:700;color:${C.blueDark};margin-bottom:6px;font-size:13px;">
+            Resumo Executivo
+          </div>
+          ${summaryText}
+        </div>
+
+        <!-- FOOTER -->
+        <div style="margin-top:20px;padding-top:14px;border-top:1px solid ${C.border};
+                    display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:11px;color:${C.text3};">
+            Dashboard de Acionamentos SCADA · GEAT · Energisa
+          </span>
+          <span style="font-size:11px;color:${C.text3};">${filename}</span>
+        </div>
+
+      </div>`;
+
+    /* ── Inject into off-screen root and capture ── */
+    const root = g('pngSnapshotRoot');
+    root.innerHTML = html;
+
+    /* Wait one more frame so the browser has laid out the injected DOM */
+    await new Promise(r => setTimeout(r, 80));
+
+    const canvas = await html2canvas(root.firstElementChild, {
+      backgroundColor: '#ffffff',
+      scale: 2,                  /* 2× for Retina sharpness                */
+      useCORS: true,
+      logging: false,
+      width: 820,
+      windowWidth: 820,
+    });
+
+    /* ── Trigger download ── */
+    const link = document.createElement('a');
+    link.href     = canvas.toDataURL('image/png');
+    link.download = filename;
+    link.click();
+
+    /* ── Cleanup ── */
+    root.innerHTML = '';
+
+  } catch (err) {
+    console.error('[exportPNG]', err);
+    showMsg('Erro ao gerar imagem: ' + err.message, 'error');
+  } finally {
+    g('pngSpinnerOverlay').classList.remove('open');
+  }
+}
+function g(id){return document.getElementById(id);}
+function v(id){return document.getElementById(id).value;}
+function set(id,val){const el=document.getElementById(id);if(el)el.innerHTML=val;}
+function hexA(hex,a){const r=parseInt(hex.slice(1,3),16),gr=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${gr},${b},${a})`;}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ─────────────────────────────── EVENTS ────────────────────────── */
+document.addEventListener('DOMContentLoaded', ()=>{
+
+  /* Upload */
+  g('uploadBtn').addEventListener('click',()=>g('csvInput').click());
+  g('csvInput').addEventListener('change',e=>loadCSV(e.target.files[0]));
+  const zone=g('uploadZone');
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag');loadCSV(e.dataTransfer.files[0]);});
+
+  /* Trocar CSV — full reset then open file picker */
+  g('btnTrocarCSV').addEventListener('click', () => {
+    if (ALL.length && !confirm('Isso removerá todos os dados atuais. Continuar?')) return;
+    resetAll();
+    /* Small delay so the upload zone is visible before the dialog opens */
+    setTimeout(() => g('csvInput').click(), 80);
+  });
+
+  /* Filters */
+  g('btnApply').addEventListener('click',applyFilters);
+  g('btnClear').addEventListener('click',clearFilters);
+  g('btnReset').addEventListener('click',clearFilters);
+  g('btnRefreshInsights').addEventListener('click',buildInsights);
+
+  /* Table search */
+  let st;
+  g('tblSearch').addEventListener('input',e=>{clearTimeout(st);st=setTimeout(()=>{searchQ=e.target.value;page=1;buildTable();},250);});
+
+  /* Table sort */
+  document.querySelectorAll('th.sortable').forEach(th=>{
+    th.addEventListener('click',()=>{
+      const col=th.dataset.col;
+      if(sortCol===col)sortDir=sortDir==='asc'?'desc':'asc';
+      else{sortCol=col;sortDir='desc';}
+      page=1;buildTable();
+    });
+  });
+
+  /* Sidebar */
+  g('toggleSidebar').addEventListener('click',()=>g('sidebar').classList.toggle('slim'));
+
+  /* Tab navigation */
+  const TITLES={
+    dashboard:  ['Dashboard de Acionamentos','Análise operacional do time SCADA/ADMS'],
+    performance:['Performance por Colaborador','Desempenho individual e distribuição horária'],
+    tendencias: ['Tendências e Distribuições','Evolução mensal, Pareto de áreas e tempos de resposta'],
+    relatorios: ['Relatórios e Exportação','Resumo executivo e exportação de dados'],
+  };
+  document.querySelectorAll('.nav-link[data-tab]').forEach(link=>{
+    link.addEventListener('click',e=>{
+      e.preventDefault();
+      const tab=link.dataset.tab;
+      document.querySelectorAll('.nav-link[data-tab]').forEach(l=>l.classList.remove('active'));
+      link.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+      g(tab)?.classList.add('active');
+      const [t,s]=TITLES[tab]||['',''];
+      set('pageTitle',t);set('pageSubtitle',s);
+      if(ALL.length){
+        if(tab==='performance'&&!TABS_BUILT.performance){
+          g('perfNoData').style.display='none';g('perfBody').style.display='block';
+          /* BUG FIX: setTimeout(fn, 50) instead of requestAnimationFrame.
+             rAF fires before the browser has completed layout for the newly
+             visible container, so canvas offsetWidth/Height are still 0 and
+             Chart.js produces invisible (0×0) renders. A 50ms delay ensures
+             the reflow is done and the canvas has real pixel dimensions.    */
+          setTimeout(()=>buildPerformance(), 50);
+          TABS_BUILT.performance=true;
+        }
+        if(tab==='tendencias'&&!TABS_BUILT.tendencias){
+          g('tendNoData').style.display='none';g('tendBody').style.display='block';
+          setTimeout(()=>buildTendencias(), 50);   /* ← same timing fix */
+          TABS_BUILT.tendencias=true;
+        }
+        if(tab==='relatorios'&&!TABS_BUILT.relatorios){
+          g('relNoData').style.display='none';g('relBody').style.display='block';
+          buildRelatorios();TABS_BUILT.relatorios=true;
+        }
+      }
+    });
+  });
+
+  /* Chart expand */
+  document.querySelectorAll('.expand-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>openChartModal(btn.dataset.cid));
+  });
+
+  /* Modals close */
+  [['closeDetail','detailModal'],['closeDetail2','detailModal'],
+   ['closeChart','chartModal'],['closePdf','pdfModal'],['closePdf2','pdfModal'],
+  ].forEach(([bid,mid])=>g(bid)?.addEventListener('click',()=>g(mid).classList.remove('open')));
+  document.querySelectorAll('.modal-overlay').forEach(m=>{
+    m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');});
+  });
+
+  /* Export */
+  ['btnExportTbl','navExportCsv','relExportCsv'].forEach(id=>g(id)?.addEventListener('click',e=>{e.preventDefault();exportCSV();}));
+  ['navExportPdf','relExportPdf'].forEach(id=>g(id)?.addEventListener('click',e=>{e.preventDefault();showPdfPreview();}));
+  g('btnGeneratePdf').addEventListener('click',generatePDF);
+  g('relExportPng')?.addEventListener('click', e => { e.preventDefault(); exportPNG(); });
+});
+
+</script>
+<!-- ── PNG SPINNER OVERLAY ──────────────────── -->
+<div id="pngSpinnerOverlay">
+  <div class="png-spinner"></div>
+  <p>Gerando imagem…</p>
+</div>
+
+<!-- ── PNG SNAPSHOT ROOT (off-screen render target) ── -->
+<div id="pngSnapshotRoot"></div>
+
+</body>
+</html>
